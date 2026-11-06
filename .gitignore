@@ -1,0 +1,17 @@
+node_modules
+dist
+functions/lib
+functions/node_modules
+.firebase
+.cursor
+*.log
+*-debug.log
+.env
+.env.local
+.env.*.local
+coverage
+.DS_Store
+Thumbs.db
+*.tsbuildinfo
+service-account*.json
+*-firebase-adminsdk-*.json

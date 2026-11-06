@@ -1,0 +1,97 @@
+@import 'tailwindcss';
+
+:root {
+  --background: #f4f6f8;
+  --foreground: #14202b;
+  --card: #ffffff;
+  --card-foreground: #14202b;
+  --primary: #12324d;
+  --primary-foreground: #f8fafc;
+  --secondary: #e7eef3;
+  --secondary-foreground: #12324d;
+  --muted: #eef2f5;
+  --muted-foreground: #5c6b7a;
+  --accent: #e36a1e;
+  --accent-foreground: #ffffff;
+  --destructive: #b42318;
+  --destructive-foreground: #ffffff;
+  --success: #1f7a4d;
+  --warning: #a16207;
+  --border: #d5dee6;
+  --input: #cfd8e1;
+  --ring: #e36a1e;
+  --sidebar: #0e2436;
+  --sidebar-foreground: #e7eef5;
+  --sidebar-muted: #93a4b5;
+  --radius: 0.8rem;
+  color-scheme: light;
+}
+
+@theme inline {
+  --font-sans: 'Noto Sans', 'Noto Sans Devanagari', ui-sans-serif, sans-serif;
+  --color-background: var(--background);
+  --color-foreground: var(--foreground);
+  --color-card: var(--card);
+  --color-card-foreground: var(--card-foreground);
+  --color-primary: var(--primary);
+  --color-primary-foreground: var(--primary-foreground);
+  --color-secondary: var(--secondary);
+  --color-secondary-foreground: var(--secondary-foreground);
+  --color-muted: var(--muted);
+  --color-muted-foreground: var(--muted-foreground);
+  --color-accent: var(--accent);
+  --color-accent-foreground: var(--accent-foreground);
+  --color-destructive: var(--destructive);
+  --color-destructive-foreground: var(--destructive-foreground);
+  --color-success: var(--success);
+  --color-warning: var(--warning);
+  --color-border: var(--border);
+  --color-input: var(--input);
+  --color-ring: var(--ring);
+  --color-sidebar: var(--sidebar);
+  --color-sidebar-foreground: var(--sidebar-foreground);
+  --color-sidebar-muted: var(--sidebar-muted);
+  --radius-lg: var(--radius);
+  --radius-md: calc(var(--radius) - 2px);
+  --radius-sm: calc(var(--radius) - 4px);
+}
+
+* {
+  border-color: var(--border);
+}
+
+html,
+body,
+#root {
+  min-height: 100%;
+}
+
+body {
+  margin: 0;
+  background: var(--background);
+  color: var(--foreground);
+  font-family: var(--font-sans);
+  text-rendering: optimizeLegibility;
+}
+
+button,
+input,
+select,
+textarea {
+  font: inherit;
+}
+
+:focus-visible {
+  outline: 2px solid var(--ring);
+  outline-offset: 2px;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+  }
+}

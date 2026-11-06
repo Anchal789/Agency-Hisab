@@ -1,0 +1,10 @@
+import { initializeApp } from 'firebase-admin/app'
+import { changeOwnPassword } from './auth/change-own-password'
+import { createStaffUser } from './auth/create-staff'
+import { resetStaffPassword } from './auth/reset-staff-password'
+import { updateStaffAccess } from './auth/update-staff'
+import { manageAgencyConfig } from './settings/manage-agency-config'
+
+initializeApp()
+
+export { changeOwnPassword, createStaffUser, resetStaffPassword, updateStaffAccess, manageAgencyConfig }

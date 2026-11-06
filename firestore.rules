@@ -1,0 +1,129 @@
+rules_version = '2';
+
+// Hisab Indane Gas Agency — production-oriented Firestore Security Rules
+// Authorization for privileged writes is enforced in Cloud Functions (Admin SDK).
+// Client SDK may only perform the narrow reads/updates documented below.
+// Role checks use Firebase Auth custom claims (request.auth.token.role), never client-writable profile fields.
+
+service cloud.firestore {
+  match /databases/{database}/documents {
+    function signedIn() {
+      return request.auth != null;
+    }
+
+    function isAdmin() {
+      return signedIn() && request.auth.token.role == 'admin';
+    }
+
+    function isStaff() {
+      return signedIn() && request.auth.token.role == 'staff';
+    }
+
+    function isSelf(userId) {
+      return signedIn() && request.auth.uid == userId;
+    }
+
+    function isActiveAgencyUser() {
+      return isAdmin() || isStaff();
+    }
+
+    // Self-service profile edits: language only. Identity, role, status, permissions,
+    // phone, synthetic auth email, and password-change flags are Admin SDK / Functions only.
+    function isLanguageOnlySelfUpdate() {
+      return request.resource.data.diff(resource.data).affectedKeys().hasOnly(['language', 'updatedAt'])
+        && request.resource.data.language in ['en', 'hi']
+        && request.resource.data.role == resource.data.role
+        && request.resource.data.status == resource.data.status
+        && request.resource.data.permissions == resource.data.permissions
+        && request.resource.data.phoneE164 == resource.data.phoneE164
+        && request.resource.data.authEmail == resource.data.authEmail
+        && request.resource.data.mustChangePassword == resource.data.mustChangePassword
+        && request.resource.data.displayName == resource.data.displayName
+        && request.resource.data.createdBy == resource.data.createdBy;
+    }
+
+    // -------------------------------------------------------------------------
+    // users — profiles mirrored from Auth; created/updated by Admin SDK Functions
+    // -------------------------------------------------------------------------
+    match /users/{userId} {
+      allow get: if isAdmin() || isSelf(userId);
+      allow list: if isAdmin();
+
+      allow update: if isActiveAgencyUser() && isSelf(userId) && isLanguageOnlySelfUpdate();
+
+      allow create, delete: if false;
+    }
+
+    // -------------------------------------------------------------------------
+    // settings — agency config is readable by signed-in users; all writes via Admin SDK
+    // -------------------------------------------------------------------------
+    match /settings/{docId} {
+      allow get: if isActiveAgencyUser() && docId == 'agency';
+      allow list: if false;
+      allow create, update, delete: if false;
+    }
+
+    // Agency master data configured in Phase 1 Settings (writes via Admin SDK Functions).
+    match /locations/{id} {
+      allow read: if isActiveAgencyUser();
+      allow create, update, delete: if false;
+    }
+
+    match /products/{id} {
+      allow read: if isActiveAgencyUser();
+      allow create, update, delete: if false;
+    }
+
+    match /priceRules/{id} {
+      allow read: if isAdmin();
+      allow create, update, delete: if false;
+    }
+
+    // -------------------------------------------------------------------------
+    // Operational / ledger collections (Phase 1+ foundation)
+    // Client writes are denied. Posting, approvals, godown exceptions, reversals,
+    // and inventory/finance mutations must go through Cloud Functions.
+    // -------------------------------------------------------------------------
+    match /transactions/{id} {
+      allow read: if isActiveAgencyUser();
+      allow create, update, delete: if false;
+    }
+
+    match /financialLedger/{id} {
+      allow read: if isAdmin();
+      allow create, update, delete: if false;
+    }
+
+    match /financialBalances/{id} {
+      allow read: if isAdmin();
+      allow create, update, delete: if false;
+    }
+
+    match /inventoryLedger/{id} {
+      allow read: if isActiveAgencyUser();
+      allow create, update, delete: if false;
+    }
+
+    match /inventoryBalances/{id} {
+      allow read: if isActiveAgencyUser();
+      allow create, update, delete: if false;
+    }
+
+    match /obligations/{id} {
+      allow read: if isActiveAgencyUser();
+      allow create, update, delete: if false;
+    }
+
+    match /auditLogs/{id} {
+      allow read: if isAdmin();
+      allow create, update, delete: if false;
+    }
+
+    // -------------------------------------------------------------------------
+    // Default deny — unmatched paths and unknown collections
+    // -------------------------------------------------------------------------
+    match /{document=**} {
+      allow read, write: if false;
+    }
+  }
+}
