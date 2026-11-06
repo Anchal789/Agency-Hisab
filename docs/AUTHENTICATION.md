@@ -45,7 +45,7 @@ Authorization uses Firebase Auth custom claims for `role` and the Firestore `use
 
 Staff with zero permissions can still sign in (for password change / account) but cannot open the dashboard or settings and see no module nav entries. Direct URL access to restricted implemented routes is blocked by route guards, not only by sidebar visibility. Unimplemented modules never get working routes.
 
-Permission → nav mapping: `customers.view`→Customers, `godown.create`→Godown, `inventory.view`→Inventory, `payments.create`→Customer dues, `reports.viewAssigned`→Reports and Hisab. `vehicles.record` and `expenses.create` have no dedicated Phase 1 nav entry yet.
+Permission → nav mapping: `customers.view`→Customers, `godown.create`→Godown, `inventory.view`→Inventory, `payments.create`→Customer dues, `reports.viewAssigned`→Reports and Hisab. Customer create/edit/import use `customers.create` / `customers.edit` in addition to view. `vehicles.record` and `expenses.create` have no dedicated nav entry yet.
 
 Permission edits are administrator-only via the `updateStaffAccess` Cloud Function. Staff cannot change their own permissions through the client or rules.
 

@@ -81,6 +81,36 @@ describe('Firestore security rules', () => {
       await setDoc(doc(db, 'locations/godown1'), { name: 'Main Godown', kind: 'godown', active: true })
       await setDoc(doc(db, 'products/cyl1'), { name: '14.2 kg', code: 'DOM142', kind: 'cylinder', unit: 'cylinder', active: true })
       await setDoc(doc(db, 'priceRules/pr1'), { productId: 'cyl1', label: 'Refill', amountPaise: 110000, active: true })
+      await setDoc(doc(db, 'customers/c1'), {
+        firstName: 'Ram',
+        lastName: 'Kumar',
+        displayName: 'Ram Kumar',
+        consumerNumber: '0001',
+        consumerNumberLower: '0001',
+        address: 'Ward 1',
+        city: 'Miragpur',
+        lastRefillDate: null,
+        status: 'active',
+        searchTokens: ['ram', 'kumar', '0001'],
+        createdBy: 'admin1',
+        updatedBy: 'admin1',
+      })
+      await setDoc(doc(db, 'customerImportBatches/b1'), {
+        fileName: 'customers.xlsx',
+        status: 'committed',
+        createdCount: 1,
+      })
+      await setDoc(doc(db, 'users/staff_noview'), {
+        phoneE164: '+919800000003',
+        authEmail: '918000000003@users.hisab.internal',
+        displayName: 'No View',
+        role: 'staff',
+        status: 'active',
+        permissions: { 'godown.create': true },
+        language: 'en',
+        mustChangePassword: false,
+        createdBy: 'admin1',
+      })
     })
   })
 
@@ -248,12 +278,27 @@ describe('Firestore security rules', () => {
     })
   })
 
+  describe('customers', () => {
+    it('allows admin and customers.view staff to read customers, denies others and all client writes', async () => {
+      const admin = testEnv.authenticatedContext('admin1', { role: 'admin' })
+      const staff = testEnv.authenticatedContext('staff1', { role: 'staff' })
+      const noView = testEnv.authenticatedContext('staff_noview', { role: 'staff' })
+
+      await assertSucceeds(getDoc(doc(admin.firestore(), 'customers/c1')))
+      await assertSucceeds(getDocs(collection(admin.firestore(), 'customers')))
+      await assertSucceeds(getDoc(doc(staff.firestore(), 'customers/c1')))
+      await assertSucceeds(getDoc(doc(staff.firestore(), 'customerImportBatches/b1')))
+      await assertFails(getDoc(doc(noView.firestore(), 'customers/c1')))
+      await assertFails(setDoc(doc(staff.firestore(), 'customers/c2'), { firstName: 'X' }))
+      await assertFails(setDoc(doc(admin.firestore(), 'customers/c3'), { firstName: 'Y' }))
+      await assertFails(updateDoc(doc(admin.firestore(), 'customers/c1'), { city: 'Hacked' }))
+    })
+  })
+
   describe('unmatched paths', () => {
     it('denies reads and writes to unknown collections', async () => {
       const admin = testEnv.authenticatedContext('admin1', { role: 'admin' })
       const db = admin.firestore()
-      await assertFails(getDoc(doc(db, 'customers/c1')))
-      await assertFails(setDoc(doc(db, 'customers/c1'), { name: 'X' }))
       await assertFails(getDoc(doc(db, 'approvalRequests/tx1')))
       await assertFails(setDoc(doc(db, 'idempotencyRecords/k1'), { transactionId: 'tx1' }))
       await assertFails(getDoc(doc(db, 'secretVault/item1')))

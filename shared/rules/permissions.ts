@@ -1,5 +1,7 @@
 export const STAFF_PERMISSION_KEYS = [
   'customers.view',
+  'customers.create',
+  'customers.edit',
   'godown.create',
   'payments.create',
   'inventory.view',
@@ -17,6 +19,8 @@ export const PASSWORD_MIN_LENGTH = 8
 export function emptyPermissions(): PermissionMap {
   return {
     'customers.view': false,
+    'customers.create': false,
+    'customers.edit': false,
     'godown.create': false,
     'payments.create': false,
     'inventory.view': false,
@@ -53,7 +57,7 @@ export function hasAnyStaffPermission(permissions: PermissionMap): boolean {
 }
 
 /**
- * Phase 1 navigation / route policy (documented):
+ * Phase 1+ navigation / route policy (documented):
  * - Admin: sees every nav entry. Implemented routes are links; unimplemented entries show as "Later".
  * - Settings and Users: administrator only (routes + nav).
  * - Dashboard (`/`): admin always; staff only when they have at least one staff permission.
@@ -73,6 +77,21 @@ export function canAccessSettings(role: AppRole): boolean {
 
 export function canAccessUsers(role: AppRole): boolean {
   return role === 'admin'
+}
+
+export function canViewCustomers(role: AppRole, permissions: PermissionMap): boolean {
+  if (role === 'admin') return true
+  return hasStaffPermission(permissions, 'customers.view')
+}
+
+export function canCreateCustomers(role: AppRole, permissions: PermissionMap): boolean {
+  if (role === 'admin') return true
+  return hasStaffPermission(permissions, 'customers.create')
+}
+
+export function canEditCustomers(role: AppRole, permissions: PermissionMap): boolean {
+  if (role === 'admin') return true
+  return hasStaffPermission(permissions, 'customers.edit')
 }
 
 export function defaultAuthenticatedPath(role: AppRole, permissions: PermissionMap): string {
@@ -95,7 +114,12 @@ export const NAV_MODULE_KEYS = [
 export type NavModuleKey = (typeof NAV_MODULE_KEYS)[number]
 
 /** Modules that currently have a working in-app route. */
-export const IMPLEMENTED_NAV_MODULES: ReadonlySet<NavModuleKey> = new Set(['dashboard', 'users', 'settings'])
+export const IMPLEMENTED_NAV_MODULES: ReadonlySet<NavModuleKey> = new Set([
+  'dashboard',
+  'customers',
+  'users',
+  'settings',
+])
 
 /** Map staff permissions to nav module keys for visibility. */
 export function staffPermissionForNavKey(navKey: string): StaffPermission | null {

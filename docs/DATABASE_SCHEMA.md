@@ -1,6 +1,6 @@
 # Database Schema
 
-Status: Phase 1 foundation live for `users`, `settings/agency`, `settings/bootstrap`, `auditLogs`, plus admin-configured `locations`, `products`, and `priceRules`. Remaining collections stay proposed until their phase.
+Status: Phase 1 foundation live for `users`, `settings/agency`, `settings/bootstrap`, `auditLogs`, plus admin-configured `locations`, `products`, and `priceRules`. Phase 2 live for `customers` and `customerImportBatches`. Remaining collections stay proposed until their phase.
 
 Firestore is the system of record. Security Rules allow clients to read what their role permits and deny client writes to privileged collections. Cloud Functions using the Admin SDK perform those writes inside Firestore transactions.
 
@@ -75,23 +75,27 @@ Seeded with one Godown location when inventory work starts, not with fake stock.
 
 ### `customers/{customerId}`
 
-- `consumerNumber` string, unique when present. Leading zeroes preserved.
-- `consumerName`, `nameNormalized` (lowercase, trimmed, for search tokens)
+Writes only via Cloud Functions (`createCustomer`, `updateCustomer`, `commitCustomerImport`).
+
+- `firstName`, `lastName`, `displayName` (normalized whitespace)
 - `address`, `city`
-- `lastRefillDate` (`YYYY-MM-DD` or null)
+- `consumerNumber` string, unique (case-insensitive via `consumerNumberLower`). Leading zeroes preserved.
+- `consumerNumberLower` for uniqueness queries
+- `lastRefillDate` (`YYYY-MM-DD` or null, Asia/Kolkata calendar date)
 - `status` (`active` | `inactive`)
-- `importBatchId`, `importSource`
 - `searchTokens[]` for name, number, address, and city prefixes
-- `createdAt`, `updatedAt`
+- `importBatchId`, `importSource` (`manual` | `excel` | null)
+- `createdAt`, `updatedAt`, `createdBy`, `updatedBy`
 
 Custom (walk-in) names on a godown sale do not create a customer master row unless the operator explicitly saves one.
 
 ### `customerImportBatches/{batchId}`
 
-- `fileName`, `uploadedBy`, `createdAt`
-- `status` (`previewed` | `committed` | `failed`)
+Writes only via Cloud Functions (`commitCustomerImport`). Idempotent on `batchId` when status is already `committed`.
+
+- `fileName`, `uploadedBy`, `createdAt`, `updatedAt`
+- `status` (`committed`)
 - `rowCount`, `createdCount`, `skippedCount`, `conflictCount`
-- `mapping` of spreadsheet columns to the five allowed fields
 
 Customer import writes customers only. It does not write `transactions` or ledgers.
 

@@ -1,5 +1,12 @@
 import { BrowserRouter, Navigate, Route, Routes } from 'react-router'
-import { canAccessDashboard, canAccessSettings, defaultAuthenticatedPath } from '@shared/rules/permissions'
+import {
+  canAccessDashboard,
+  canAccessSettings,
+  canCreateCustomers,
+  canEditCustomers,
+  canViewCustomers,
+  defaultAuthenticatedPath,
+} from '@shared/rules/permissions'
 import { AppShell } from '@/app/layouts/AppShell'
 import { AppProviders } from '@/app/providers/AppProviders'
 import { useAuth } from '@/app/providers/AuthProvider'
@@ -14,6 +21,11 @@ import { ChangePasswordPage } from '@/modules/auth/ChangePasswordPage'
 import { ForgotPasswordPage } from '@/modules/auth/ForgotPasswordPage'
 import { LoginPage } from '@/modules/auth/LoginPage'
 import { MissingConfigPage } from '@/modules/auth/MissingConfigPage'
+import { CustomerCreatePage } from '@/modules/customers/CustomerCreatePage'
+import { CustomerDetailPage } from '@/modules/customers/CustomerDetailPage'
+import { CustomerEditPage } from '@/modules/customers/CustomerEditPage'
+import { CustomerImportPage } from '@/modules/customers/CustomerImportPage'
+import { CustomersPage } from '@/modules/customers/CustomersPage'
 import { DashboardPage } from '@/modules/dashboard/DashboardPage'
 import { SettingsPage } from '@/modules/settings/SettingsPage'
 import { UsersPage } from '@/modules/users/UsersPage'
@@ -35,6 +47,24 @@ function DashboardGate() {
 function SettingsGate() {
   const { role } = useAuth()
   return <PermissionRoute allow={canAccessSettings(role ?? 'staff')} />
+}
+
+function CustomersViewGate() {
+  const { role, profile } = useAuth()
+  const allow = Boolean(role && profile && canViewCustomers(role, profile.permissions))
+  return <PermissionRoute allow={allow} />
+}
+
+function CustomersCreateGate() {
+  const { role, profile } = useAuth()
+  const allow = Boolean(role && profile && canCreateCustomers(role, profile.permissions))
+  return <PermissionRoute allow={allow} />
+}
+
+function CustomersEditGate() {
+  const { role, profile } = useAuth()
+  const allow = Boolean(role && profile && canEditCustomers(role, profile.permissions))
+  return <PermissionRoute allow={allow} />
 }
 
 export function App() {
@@ -62,6 +92,17 @@ export function App() {
                 <Route path="account" element={<AccountPage />} />
                 <Route element={<DashboardGate />}>
                   <Route index element={<DashboardPage />} />
+                </Route>
+                <Route element={<CustomersCreateGate />}>
+                  <Route path="customers/new" element={<CustomerCreatePage />} />
+                  <Route path="customers/import" element={<CustomerImportPage />} />
+                </Route>
+                <Route element={<CustomersEditGate />}>
+                  <Route path="customers/:customerId/edit" element={<CustomerEditPage />} />
+                </Route>
+                <Route element={<CustomersViewGate />}>
+                  <Route path="customers" element={<CustomersPage />} />
+                  <Route path="customers/:customerId" element={<CustomerDetailPage />} />
                 </Route>
                 <Route element={<SettingsGate />}>
                   <Route path="settings" element={<SettingsPage />} />

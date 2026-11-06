@@ -14,7 +14,7 @@ function withPerms(keys: Array<keyof PermissionMap>): PermissionMap {
 }
 
 describe('navigation permission matrix', () => {
-  it('shows admin every module; only dashboard/users/settings are implemented routes', () => {
+  it('shows admin every module; dashboard/customers/users/settings are implemented routes', () => {
     const keys = visibleNavModules('admin', emptyPermissions())
     expect(keys).toEqual([
       'dashboard',
@@ -28,7 +28,7 @@ describe('navigation permission matrix', () => {
       'users',
       'settings',
     ])
-    expect(isNavModuleImplemented('customers')).toBe(false)
+    expect(isNavModuleImplemented('customers')).toBe(true)
     expect(isNavModuleImplemented('dashboard')).toBe(true)
     expect(isNavModuleImplemented('users')).toBe(true)
     expect(isNavModuleImplemented('settings')).toBe(true)
@@ -61,6 +61,8 @@ describe('navigation permission matrix', () => {
   it('shows all staff-authorized modules when all permissions are granted', () => {
     const permissions = withPerms([
       'customers.view',
+      'customers.create',
+      'customers.edit',
       'godown.create',
       'payments.create',
       'inventory.view',

@@ -50,7 +50,7 @@ export function AppShell() {
         </SheetContent>
       </Sheet>
       <div className={cn('flex min-h-screen flex-col pb-16 md:pb-0', collapsed ? 'md:pl-[4.5rem]' : 'md:pl-64')}>
-        <header className="sticky top-0 z-20 flex h-14 items-center gap-2 border-b border-border bg-card/95 px-3 backdrop-blur md:px-5">
+        <header className="sticky top-0 z-20 flex h-14 items-center gap-2 border-b border-border bg-card/95 px-[calc(1.25rem*1.25)] backdrop-blur md:px-[calc(1.75rem*1.25)]">
           <Button variant="ghost" size="icon" className="md:hidden" aria-label={t('common.openMenu')} onClick={() => setMobileNavOpen(true)}>
             <Menu className="h-4 w-4" />
           </Button>

@@ -1,6 +1,6 @@
 # Development Phases
 
-Status: Phase 1 complete, including phone+password authentication enhancement. Do not start Phase 2 until explicitly approved.
+Status: Phase 2 Customer Master and Excel import implemented locally. Do not start Phase 3 until explicitly approved. Do not push or deploy without approval.
 
 Work proceeds in order. A phase starts only after the product owner sends:
 
@@ -46,7 +46,16 @@ Out of scope (deferred): customers, sales, inventory, real metrics, Capacitor, o
 
 ## Phase 2 — Customer master and Excel import
 
-Not started. Requires: `APPROVE PHASE 1 — START NEXT PHASE` (or equivalent explicit approval).
+Implemented locally (awaiting manual smoke approval before Phase 3):
+
+- Customer list / detail / add / edit with field validation and duplicate consumer-number checks
+- Search by name and consumer number (token/prefix) across the full collection, not only the visible page
+- Excel import wizard: upload → column mapping → preview/validation → batched commit → summary + error CSV
+- Permissions: `customers.view`, `customers.create`, `customers.edit` (admin retains full access)
+- Firestore rules: customers readable with view permission; client writes denied
+- Cloud Functions: `createCustomer`, `updateCustomer`, `checkCustomerConsumerNumbers`, `commitCustomerImport`
+
+Out of scope for Phase 2: godown register, inventory, dues, financial posting.
 
 ## Phase 3 — Godown customer register and daily sales
 

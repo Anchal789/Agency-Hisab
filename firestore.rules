@@ -27,6 +27,20 @@ service cloud.firestore {
       return isAdmin() || isStaff();
     }
 
+    function staffProfile() {
+      return get(/databases/$(database)/documents/users/$(request.auth.uid)).data;
+    }
+
+    function staffPermissionTrue(permission) {
+      return isStaff()
+        && staffProfile().status == 'active'
+        && staffProfile().permissions[permission] == true;
+    }
+
+    function canViewCustomers() {
+      return isAdmin() || staffPermissionTrue('customers.view');
+    }
+
     // Self-service profile edits: language only. Identity, role, status, permissions,
     // phone, synthetic auth email, and password-change flags are Admin SDK / Functions only.
     function isLanguageOnlySelfUpdate() {
@@ -76,6 +90,19 @@ service cloud.firestore {
 
     match /priceRules/{id} {
       allow read: if isAdmin();
+      allow create, update, delete: if false;
+    }
+
+    // -------------------------------------------------------------------------
+    // customers — Phase 2 Customer Master (writes via Admin SDK Functions only)
+    // -------------------------------------------------------------------------
+    match /customers/{customerId} {
+      allow read: if canViewCustomers();
+      allow create, update, delete: if false;
+    }
+
+    match /customerImportBatches/{batchId} {
+      allow read: if canViewCustomers();
       allow create, update, delete: if false;
     }
 

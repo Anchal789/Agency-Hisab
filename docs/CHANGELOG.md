@@ -2,6 +2,15 @@
 
 ## Unreleased
 
+### 2026-11-07 — Phase 2 Customer Master and Excel import
+
+- Customer list, detail, add, and edit with validation, duplicate consumer-number checks, and Asia/Kolkata date display.
+- Search by first/last/full/partial name and consumer number via `searchTokens` (full collection, not page-only).
+- Excel import wizard: upload (.xlsx/.xls), column mapping, preview with invalid/duplicate reporting, chunked Firestore commits, progress, summary, and CSV error export.
+- Permissions: `customers.view`, `customers.create`, `customers.edit`; routes and nav gated; Firestore client writes denied.
+- Cloud Functions: `createCustomer`, `updateCustomer`, `checkCustomerConsumerNumbers`, `commitCustomerImport` (idempotent batch ids).
+- Unit, rules, typecheck, and production build validation. Not pushed or deployed.
+
 ### 2026-11-07 — Phase 1 Settings, Account and Users search
 
 - Expanded admin Settings: language persistence, editable agency profile, payment methods/destinations, locations/godowns, cylinder types, and price rules via `manageAgencyConfig` (Admin SDK).

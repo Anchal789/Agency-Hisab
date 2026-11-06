@@ -37,8 +37,12 @@ export function authErrorKey(error: unknown): string {
 
 export function callableErrorKey(error: unknown): string {
   const code = firebaseCode(error)
+  const message = firebaseMessage(error).toLowerCase()
   if (code.includes('permission-denied')) return 'errors.permissionDenied'
-  if (code.includes('already-exists')) return 'users.phoneInUse'
+  if (code.includes('already-exists')) {
+    if (message.includes('consumer')) return 'customers.duplicateConsumer'
+    return 'users.phoneInUse'
+  }
   if (code.includes('invalid-argument')) return 'errors.invalidInput'
   if (code.includes('unavailable') || code.includes('internal') || code.includes('not-found')) return 'errors.backendUnavailable'
   return 'errors.generic'

@@ -16,7 +16,9 @@
     "../shared/auth/phone.ts",
     "../shared/schemas/staff.ts",
     "../shared/schemas/agency-settings.ts",
+    "../shared/schemas/customer.ts",
     "../shared/models/agency-config.ts",
+    "../shared/models/customer.ts",
     "../shared/rules/permissions.ts"
   ]
 }
