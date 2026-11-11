@@ -20,7 +20,7 @@ describe('permissions and profile parsing', () => {
 
   it('enforces documented dashboard/settings/users access policy', () => {
     const none = emptyPermissions()
-    const some = { ...emptyPermissions(), 'godown.create': true }
+    const some = { ...emptyPermissions(), 'godown.view': true }
 
     expect(canAccessDashboard('admin', none)).toBe(true)
     expect(canAccessDashboard('staff', none)).toBe(false)
@@ -37,7 +37,9 @@ describe('permissions and profile parsing', () => {
   it('parses permission maps from Firestore-shaped objects without dropping granted keys', () => {
     const fromFirestore = normalizePermissions({
       'customers.view': true,
+      'godown.view': true,
       'godown.create': false,
+      'godown.edit': false,
       'payments.create': true,
       'inventory.view': false,
       'vehicles.record': false,

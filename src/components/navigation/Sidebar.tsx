@@ -47,7 +47,7 @@ export function Sidebar({
       title: t('nav.operations'),
       items: [
         { key: 'dashboard', to: '/', label: t('nav.dashboard'), icon: LayoutDashboard },
-        { key: 'godown', label: t('nav.godown'), icon: Warehouse },
+        { key: 'godown', to: '/godown', label: t('nav.godown'), icon: Warehouse },
         { key: 'hisab', label: t('nav.hisab'), icon: BookOpen },
       ],
     },

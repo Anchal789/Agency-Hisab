@@ -11,8 +11,17 @@ describe('agency configuration models', () => {
     })
     expect(parsed.timezone).toBe('Asia/Kolkata')
     expect(parsed.currency).toBe('INR')
-    expect(parsed.paymentMethods).toEqual([{ id: 'pm1', name: 'Cash', active: true }])
+    expect(parsed.paymentMethods).toEqual([{ id: 'pm1', name: 'Cash', kind: 'cash', active: true }])
     expect(parsed.receivingAccounts[0]?.kind).toBe('cash')
+  })
+
+  it('normalizes legacy portal destination kind and Online payment method', () => {
+    const parsed = parseAgencySettings({
+      paymentMethods: [{ id: 'pm_online', name: 'Online', active: true }],
+      receivingAccounts: [{ id: 'ra_portal', name: 'Portal', kind: 'portal', active: true }],
+    })
+    expect(parsed.paymentMethods[0]).toMatchObject({ name: 'UPI', kind: 'upi' })
+    expect(parsed.receivingAccounts[0]?.kind).toBe('indane_portal')
   })
 
   it('rejects invalid manage payloads and accepts profile updates', () => {

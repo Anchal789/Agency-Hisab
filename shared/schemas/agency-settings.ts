@@ -1,5 +1,10 @@
 import { z } from 'zod'
-import { AGENCY_CURRENCIES, AGENCY_TIMEZONES } from '../models/agency-config'
+import {
+  AGENCY_CURRENCIES,
+  AGENCY_TIMEZONES,
+  normalizePaymentCategory,
+  PAYMENT_CATEGORIES,
+} from '../models/agency-config'
 
 /** Callable JSON often turns missing ids into null; treat null/empty as “create”. */
 const optionalDocIdSchema = z.preprocess((value) => {
@@ -7,14 +12,23 @@ const optionalDocIdSchema = z.preprocess((value) => {
   return value
 }, z.string().trim().min(1).max(80).optional())
 
+const paymentCategorySchema = z.preprocess((value) => {
+  const normalized = normalizePaymentCategory(value)
+  return normalized ?? value
+}, z.enum(PAYMENT_CATEGORIES))
+
 const namedItemSchema = z.object({
   id: z.string().trim().min(1).max(80),
   name: z.string().trim().min(1).max(80),
   active: z.boolean(),
 })
 
+const paymentMethodSchema = namedItemSchema.extend({
+  kind: paymentCategorySchema,
+})
+
 const receivingAccountSchema = namedItemSchema.extend({
-  kind: z.enum(['cash', 'upi', 'bank', 'portal', 'other']),
+  kind: paymentCategorySchema,
 })
 
 function noDuplicateNames<T extends { name: string; id: string }>(items: T[], ctx: z.RefinementCtx, path: string) {
@@ -38,7 +52,7 @@ export const updateAgencyProfileSchema = z.object({
 
 export const setPaymentMethodsSchema = z
   .object({
-    items: z.array(namedItemSchema).max(40),
+    items: z.array(paymentMethodSchema).max(40),
   })
   .superRefine((value, ctx) => noDuplicateNames(value.items, ctx, 'items'))
 

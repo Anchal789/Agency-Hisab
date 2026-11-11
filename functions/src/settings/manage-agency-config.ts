@@ -57,9 +57,15 @@ export const manageAgencyConfig = functions
     }
 
     if (action === 'setPaymentMethods') {
+      // Persist canonical kinds (schema already normalizes legacy "portal" → indane_portal).
       await agencyRef.set(
         {
-          paymentMethods: parsed.data.payload.items,
+          paymentMethods: parsed.data.payload.items.map((item) => ({
+            id: item.id,
+            name: item.name,
+            kind: item.kind,
+            active: item.active,
+          })),
           updatedAt: FieldValue.serverTimestamp(),
           updatedBy: actorUid,
         },
@@ -71,7 +77,12 @@ export const manageAgencyConfig = functions
     if (action === 'setReceivingAccounts') {
       await agencyRef.set(
         {
-          receivingAccounts: parsed.data.payload.items,
+          receivingAccounts: parsed.data.payload.items.map((item) => ({
+            id: item.id,
+            name: item.name,
+            kind: item.kind,
+            active: item.active,
+          })),
           updatedAt: FieldValue.serverTimestamp(),
           updatedBy: actorUid,
         },

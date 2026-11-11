@@ -41,6 +41,15 @@ service cloud.firestore {
       return isAdmin() || staffPermissionTrue('customers.view');
     }
 
+    function canViewGodown() {
+      return isAdmin() || staffPermissionTrue('godown.view');
+    }
+
+    // Registered godown sales need customer master lookup without granting the Customers module.
+    function canReadCustomerMaster() {
+      return canViewCustomers() || canViewGodown();
+    }
+
     // Self-service profile edits: language only. Identity, role, status, permissions,
     // phone, synthetic auth email, and password-change flags are Admin SDK / Functions only.
     function isLanguageOnlySelfUpdate() {
@@ -97,7 +106,7 @@ service cloud.firestore {
     // customers — Phase 2 Customer Master (writes via Admin SDK Functions only)
     // -------------------------------------------------------------------------
     match /customers/{customerId} {
-      allow read: if canViewCustomers();
+      allow read: if canReadCustomerMaster();
       allow create, update, delete: if false;
     }
 
@@ -112,8 +121,12 @@ service cloud.firestore {
     // and inventory/finance mutations must go through Cloud Functions.
     // -------------------------------------------------------------------------
     match /transactions/{id} {
-      allow read: if isActiveAgencyUser();
+      allow read: if canViewGodown();
       allow create, update, delete: if false;
+    }
+
+    match /idempotencyRecords/{id} {
+      allow read, create, update, delete: if false;
     }
 
     match /financialLedger/{id} {
@@ -137,7 +150,7 @@ service cloud.firestore {
     }
 
     match /obligations/{id} {
-      allow read: if isActiveAgencyUser();
+      allow read: if canViewGodown();
       allow create, update, delete: if false;
     }
 

@@ -53,8 +53,14 @@ describe('navigation permission matrix', () => {
     expect(visibleNavModules('staff', permissions)).toEqual(['dashboard', 'inventory'])
   })
 
+  it('shows godown when godown.view is granted', () => {
+    const permissions = withPerms(['godown.view'])
+    expect(visibleNavModules('staff', permissions)).toEqual(['dashboard', 'godown'])
+    expect(isNavModuleImplemented('godown')).toBe(true)
+  })
+
   it('shows exactly two modules when two permissions are granted', () => {
-    const permissions = withPerms(['customers.view', 'godown.create'])
+    const permissions = withPerms(['customers.view', 'godown.view'])
     expect(visibleNavModules('staff', permissions)).toEqual(['dashboard', 'godown', 'customers'])
   })
 
@@ -63,7 +69,9 @@ describe('navigation permission matrix', () => {
       'customers.view',
       'customers.create',
       'customers.edit',
+      'godown.view',
       'godown.create',
+      'godown.edit',
       'payments.create',
       'inventory.view',
       'vehicles.record',

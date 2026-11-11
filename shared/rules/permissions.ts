@@ -2,7 +2,9 @@ export const STAFF_PERMISSION_KEYS = [
   'customers.view',
   'customers.create',
   'customers.edit',
+  'godown.view',
   'godown.create',
+  'godown.edit',
   'payments.create',
   'inventory.view',
   'vehicles.record',
@@ -21,7 +23,9 @@ export function emptyPermissions(): PermissionMap {
     'customers.view': false,
     'customers.create': false,
     'customers.edit': false,
+    'godown.view': false,
     'godown.create': false,
+    'godown.edit': false,
     'payments.create': false,
     'inventory.view': false,
     'vehicles.record': false,
@@ -94,6 +98,26 @@ export function canEditCustomers(role: AppRole, permissions: PermissionMap): boo
   return hasStaffPermission(permissions, 'customers.edit')
 }
 
+export function canViewGodown(role: AppRole, permissions: PermissionMap): boolean {
+  if (role === 'admin') return true
+  return hasStaffPermission(permissions, 'godown.view')
+}
+
+export function canCreateGodown(role: AppRole, permissions: PermissionMap): boolean {
+  if (role === 'admin') return true
+  return hasStaffPermission(permissions, 'godown.create')
+}
+
+export function canEditGodown(role: AppRole, permissions: PermissionMap): boolean {
+  if (role === 'admin') return true
+  return hasStaffPermission(permissions, 'godown.edit')
+}
+
+/** Physical delete is never allowed; admin may reverse today's godown entry only. */
+export function canReverseGodown(role: AppRole): boolean {
+  return role === 'admin'
+}
+
 export function defaultAuthenticatedPath(role: AppRole, permissions: PermissionMap): string {
   return canAccessDashboard(role, permissions) ? '/' : '/account'
 }
@@ -116,6 +140,7 @@ export type NavModuleKey = (typeof NAV_MODULE_KEYS)[number]
 /** Modules that currently have a working in-app route. */
 export const IMPLEMENTED_NAV_MODULES: ReadonlySet<NavModuleKey> = new Set([
   'dashboard',
+  'godown',
   'customers',
   'users',
   'settings',
@@ -127,7 +152,7 @@ export function staffPermissionForNavKey(navKey: string): StaffPermission | null
     case 'customers':
       return 'customers.view'
     case 'godown':
-      return 'godown.create'
+      return 'godown.view'
     case 'inventory':
       return 'inventory.view'
     case 'dues':

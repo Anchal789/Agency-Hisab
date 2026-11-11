@@ -17,8 +17,13 @@
     "../shared/schemas/staff.ts",
     "../shared/schemas/agency-settings.ts",
     "../shared/schemas/customer.ts",
+    "../shared/schemas/godown.ts",
     "../shared/models/agency-config.ts",
     "../shared/models/customer.ts",
-    "../shared/rules/permissions.ts"
+    "../shared/models/money.ts",
+    "../shared/models/transaction.ts",
+    "../shared/calculations/business-date.ts",
+    "../shared/rules/permissions.ts",
+    "../shared/rules/payment-destinations.ts"
   ]
 }

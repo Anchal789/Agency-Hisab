@@ -3,8 +3,11 @@ import {
   canAccessDashboard,
   canAccessSettings,
   canCreateCustomers,
+  canCreateGodown,
   canEditCustomers,
+  canEditGodown,
   canViewCustomers,
+  canViewGodown,
   defaultAuthenticatedPath,
 } from '@shared/rules/permissions'
 import { AppShell } from '@/app/layouts/AppShell'
@@ -27,6 +30,10 @@ import { CustomerEditPage } from '@/modules/customers/CustomerEditPage'
 import { CustomerImportPage } from '@/modules/customers/CustomerImportPage'
 import { CustomersPage } from '@/modules/customers/CustomersPage'
 import { DashboardPage } from '@/modules/dashboard/DashboardPage'
+import { GodownCreatePage } from '@/modules/godown/GodownCreatePage'
+import { GodownDetailPage } from '@/modules/godown/GodownDetailPage'
+import { GodownEditPage } from '@/modules/godown/GodownEditPage'
+import { GodownPage } from '@/modules/godown/GodownPage'
 import { SettingsPage } from '@/modules/settings/SettingsPage'
 import { UsersPage } from '@/modules/users/UsersPage'
 import { missingFirebaseEnv } from '@/services/firebase/client'
@@ -67,6 +74,24 @@ function CustomersEditGate() {
   return <PermissionRoute allow={allow} />
 }
 
+function GodownViewGate() {
+  const { role, profile } = useAuth()
+  const allow = Boolean(role && profile && canViewGodown(role, profile.permissions))
+  return <PermissionRoute allow={allow} />
+}
+
+function GodownCreateGate() {
+  const { role, profile } = useAuth()
+  const allow = Boolean(role && profile && canCreateGodown(role, profile.permissions))
+  return <PermissionRoute allow={allow} />
+}
+
+function GodownEditGate() {
+  const { role, profile } = useAuth()
+  const allow = Boolean(role && profile && canEditGodown(role, profile.permissions))
+  return <PermissionRoute allow={allow} />
+}
+
 export function App() {
   if (missingFirebaseEnv().length > 0) {
     return (
@@ -103,6 +128,16 @@ export function App() {
                 <Route element={<CustomersViewGate />}>
                   <Route path="customers" element={<CustomersPage />} />
                   <Route path="customers/:customerId" element={<CustomerDetailPage />} />
+                </Route>
+                <Route element={<GodownCreateGate />}>
+                  <Route path="godown/new" element={<GodownCreatePage />} />
+                </Route>
+                <Route element={<GodownEditGate />}>
+                  <Route path="godown/:transactionId/edit" element={<GodownEditPage />} />
+                </Route>
+                <Route element={<GodownViewGate />}>
+                  <Route path="godown" element={<GodownPage />} />
+                  <Route path="godown/:transactionId" element={<GodownDetailPage />} />
                 </Route>
                 <Route element={<SettingsGate />}>
                   <Route path="settings" element={<SettingsPage />} />

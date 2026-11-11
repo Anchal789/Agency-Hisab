@@ -1,6 +1,6 @@
 # Development Phases
 
-Status: Phase 2 Customer Master and Excel import implemented locally. Do not start Phase 3 until explicitly approved. Do not push or deploy without approval.
+Status: Phase 3 Godown Register and Daily Sales implemented locally. Awaiting manual testing and approval before Phase 4. Do not push or deploy without approval.
 
 Work proceeds in order. A phase starts only after the product owner sends:
 
@@ -46,7 +46,7 @@ Out of scope (deferred): customers, sales, inventory, real metrics, Capacitor, o
 
 ## Phase 2 — Customer master and Excel import
 
-Implemented locally (awaiting manual smoke approval before Phase 3):
+Status: **complete** (manual smoke passed before Phase 3 start)
 
 - Customer list / detail / add / edit with field validation and duplicate consumer-number checks
 - Search by name and consumer number (token/prefix) across the full collection, not only the visible page
@@ -59,7 +59,29 @@ Out of scope for Phase 2: godown register, inventory, dues, financial posting.
 
 ## Phase 3 — Godown customer register and daily sales
 
-Not started.
+Implemented locally (awaiting manual smoke approval before Phase 4):
+
+- Godown register list with date filter, search, booking/customer-kind filters, and daily totals from posted transactions
+- Create/edit godown sales for registered and custom customers; booking / no-booking; cylinder quantities; payment method and destination from Settings
+- Empty-cylinder returns against open obligations without rewriting the original sale
+- Immediate post with `approval: not_required` (no approval queue)
+- Admin-only reverse/delete for today’s Asia/Kolkata business date (two confirmations + reason)
+- Permissions: `godown.view`, `godown.create`, `godown.edit`; delete/reverse admin-only
+- Cloud Functions: `createGodownSale`, `updateGodownSale`, `reverseGodownSale`, `recordEmptyReturn`
+- Minimum schema for Phase 4/5: empty-cylinder `obligations` and money fields on transactions; inventory/financial ledgers not posted yet
+
+Out of scope for Phase 3: inventory UI/reconciliation, customer dues UI, financial ledger posting, expenses, agents/vehicles.
+
+### Phase 3 verification (executed)
+
+| Check | Result |
+| --- | --- |
+| `npm run typecheck` | Passed |
+| `npm --prefix functions run typecheck` | Passed |
+| `npm test` (64 unit tests) | Passed |
+| `npm run build` | Passed |
+| `npm run build:functions` | Passed |
+| `npm run test:rules` (15 rules tests, emulator) | Passed |
 
 ## Phase 4 — Inventory and empty-cylinder obligations
 

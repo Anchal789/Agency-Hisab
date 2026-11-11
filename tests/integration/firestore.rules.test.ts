@@ -248,11 +248,31 @@ describe('Firestore security rules', () => {
       await assertFails(setDoc(doc(staff.firestore(), 'transactions/tx_godown'), { type: 'godown_sale', approval: 'not_required' }))
     })
 
-    it('allows staff to read transactions but not financial ledgers', async () => {
-      const staff = testEnv.authenticatedContext('staff1', { role: 'staff' })
-      await assertSucceeds(getDoc(doc(staff.firestore(), 'transactions/tx1')))
-      await assertFails(getDoc(doc(staff.firestore(), 'financialLedger/fl1')))
-      await assertFails(getDoc(doc(staff.firestore(), 'financialBalances/cash')))
+    it('allows godown.view staff to read transactions/obligations; denies customers-only staff and all financial ledger reads', async () => {
+      const customersOnly = testEnv.authenticatedContext('staff1', { role: 'staff' })
+      const godownCreateOnly = testEnv.authenticatedContext('staff_noview', { role: 'staff' })
+      await testEnv.withSecurityRulesDisabled(async (context) => {
+        await setDoc(doc(context.firestore(), 'users/staff_godown'), {
+          phoneE164: '+919800000004',
+          authEmail: '918000000004@users.hisab.internal',
+          displayName: 'Godown',
+          role: 'staff',
+          status: 'active',
+          permissions: { 'godown.view': true },
+          language: 'en',
+          mustChangePassword: false,
+          createdBy: 'admin1',
+        })
+      })
+      const godownView = testEnv.authenticatedContext('staff_godown', { role: 'staff' })
+
+      await assertSucceeds(getDoc(doc(godownView.firestore(), 'transactions/tx1')))
+      await assertSucceeds(getDoc(doc(godownView.firestore(), 'obligations/ob1')))
+      await assertFails(getDoc(doc(customersOnly.firestore(), 'transactions/tx1')))
+      await assertFails(getDoc(doc(godownCreateOnly.firestore(), 'transactions/tx1')))
+      await assertFails(getDoc(doc(godownView.firestore(), 'financialLedger/fl1')))
+      await assertFails(getDoc(doc(godownView.firestore(), 'financialBalances/cash')))
+      await assertFails(getDoc(doc(godownView.firestore(), 'idempotencyRecords/k1')))
     })
 
     it('denies client writes to financial, inventory, obligations, and audit collections', async () => {
@@ -279,15 +299,31 @@ describe('Firestore security rules', () => {
   })
 
   describe('customers', () => {
-    it('allows admin and customers.view staff to read customers, denies others and all client writes', async () => {
+    it('allows admin, customers.view, and godown.view staff to read customers; denies create-only staff and all client writes', async () => {
       const admin = testEnv.authenticatedContext('admin1', { role: 'admin' })
       const staff = testEnv.authenticatedContext('staff1', { role: 'staff' })
       const noView = testEnv.authenticatedContext('staff_noview', { role: 'staff' })
+      await testEnv.withSecurityRulesDisabled(async (context) => {
+        await setDoc(doc(context.firestore(), 'users/staff_godown_view'), {
+          phoneE164: '+919800000005',
+          authEmail: '918000000005@users.hisab.internal',
+          displayName: 'Godown View',
+          role: 'staff',
+          status: 'active',
+          permissions: { 'godown.view': true },
+          language: 'en',
+          mustChangePassword: false,
+          createdBy: 'admin1',
+        })
+      })
+      const godownView = testEnv.authenticatedContext('staff_godown_view', { role: 'staff' })
 
       await assertSucceeds(getDoc(doc(admin.firestore(), 'customers/c1')))
       await assertSucceeds(getDocs(collection(admin.firestore(), 'customers')))
       await assertSucceeds(getDoc(doc(staff.firestore(), 'customers/c1')))
       await assertSucceeds(getDoc(doc(staff.firestore(), 'customerImportBatches/b1')))
+      await assertSucceeds(getDoc(doc(godownView.firestore(), 'customers/c1')))
+      await assertFails(getDoc(doc(godownView.firestore(), 'customerImportBatches/b1')))
       await assertFails(getDoc(doc(noView.firestore(), 'customers/c1')))
       await assertFails(setDoc(doc(staff.firestore(), 'customers/c2'), { firstName: 'X' }))
       await assertFails(setDoc(doc(admin.firestore(), 'customers/c3'), { firstName: 'Y' }))

@@ -1,6 +1,6 @@
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { collection, doc, getDoc, getDocs, orderBy, query, serverTimestamp, updateDoc } from 'firebase/firestore'
-import { useMemo, useState, type ReactNode } from 'react'
+import { useMemo, useState } from 'react'
 import { useTranslation } from 'react-i18next'
 import { toast } from 'sonner'
 import { formatPaise, rupeesToPaise } from '@shared/models/money'
@@ -10,12 +10,13 @@ import {
   parseLocation,
   parsePriceRule,
   parseProduct,
+  PAYMENT_CATEGORIES,
   type LocationDoc,
-  type NamedConfigItem,
+  type PaymentCategory,
+  type PaymentMethod,
   type PriceRuleDoc,
   type ProductDoc,
   type ReceivingAccount,
-  type ReceivingAccountKind,
 } from '@shared/models/agency-config'
 import { useAuth } from '@/app/providers/AuthProvider'
 import { ConfirmationDialog } from '@/components/common/ConfirmationDialog'
@@ -35,8 +36,8 @@ import { manageAgencyConfig } from '@/services/api/agency-settings'
 import { callableErrorMessage } from '@/services/errors'
 import { getFirebase } from '@/services/firebase/client'
 
-type DraftNamed = { id?: string; name: string }
-type DraftAccount = { id?: string; name: string; kind: ReceivingAccountKind }
+type DraftNamed = { id?: string; name: string; kind: PaymentCategory }
+type DraftAccount = { id?: string; name: string; kind: PaymentCategory }
 type DraftLocation = { id?: string; name: string; kind: 'godown' | 'other' }
 type DraftProduct = { id?: string; name: string; code: string; kind: 'cylinder' | 'accessory' | 'other'; unit: string }
 type DraftPrice = { id?: string; productId: string; label: string; amountRupees: string }
@@ -48,7 +49,7 @@ export function SettingsPage() {
   const [agencyName, setAgencyName] = useState('')
   const [timezone, setTimezone] = useState('Asia/Kolkata')
   const [currency, setCurrency] = useState('INR')
-  const [methodDraft, setMethodDraft] = useState<DraftNamed>({ name: '' })
+  const [methodDraft, setMethodDraft] = useState<DraftNamed>({ name: '', kind: 'cash' })
   const [accountDraft, setAccountDraft] = useState<DraftAccount>({ name: '', kind: 'cash' })
   const [locationDraft, setLocationDraft] = useState<DraftLocation>({ name: '', kind: 'godown' })
   const [productDraft, setProductDraft] = useState<DraftProduct>({
@@ -116,8 +117,9 @@ export function SettingsPage() {
         queryClient.invalidateQueries({ queryKey: ['settings', 'locations'] }),
         queryClient.invalidateQueries({ queryKey: ['settings', 'products'] }),
         queryClient.invalidateQueries({ queryKey: ['settings', 'priceRules'] }),
+        queryClient.invalidateQueries({ queryKey: ['godown-config'] }),
       ])
-      setMethodDraft({ name: '' })
+      setMethodDraft({ name: '', kind: 'cash' })
       setAccountDraft({ name: '', kind: 'cash' })
       setLocationDraft({ name: '', kind: 'godown' })
       setProductDraft({ name: '', code: '', kind: 'cylinder', unit: 'cylinder' })
@@ -146,9 +148,9 @@ export function SettingsPage() {
     }
   }
 
-  function saveNamedList(kind: 'payment' | 'receiving', items: NamedConfigItem[] | ReceivingAccount[]) {
+  function saveNamedList(kind: 'payment' | 'receiving', items: PaymentMethod[] | ReceivingAccount[]) {
     if (kind === 'payment') {
-      configMutation.mutate({ action: 'setPaymentMethods', payload: { items: items as NamedConfigItem[] } })
+      configMutation.mutate({ action: 'setPaymentMethods', payload: { items: items as PaymentMethod[] } })
       return
     }
     configMutation.mutate({ action: 'setReceivingAccounts', payload: { items: items as ReceivingAccount[] } })
@@ -157,7 +159,7 @@ export function SettingsPage() {
   function upsertNamed(
     kind: 'payment' | 'receiving',
     draft: DraftNamed | DraftAccount,
-    existing: NamedConfigItem[] | ReceivingAccount[],
+    existing: PaymentMethod[] | ReceivingAccount[],
   ) {
     const name = draft.name.trim()
     if (name.length < 1) {
@@ -171,7 +173,11 @@ export function SettingsPage() {
       return
     }
     if (kind === 'payment') {
-      const next = [...(existing as NamedConfigItem[]).filter((item) => item.id !== id), { id, name, active: true }]
+      const methodDraftValue = draft as DraftNamed
+      const next = [
+        ...(existing as PaymentMethod[]).filter((item) => item.id !== id),
+        { id, name, kind: methodDraftValue.kind, active: true },
+      ]
       saveNamedList('payment', next)
       return
     }
@@ -255,25 +261,53 @@ export function SettingsPage() {
           </FormSection>
 
           <FormSection title={t('settings.paymentMethodsTitle')} description={t('settings.paymentMethodsBody')}>
-            <ConfigEditor
-              draftName={methodDraft.name}
-              onDraftName={(name) => setMethodDraft((current) => ({ ...current, name }))}
-              onSave={() => upsertNamed('payment', methodDraft, agency.paymentMethods)}
-              onCancelEdit={() => setMethodDraft({ name: '' })}
-              editing={Boolean(methodDraft.id)}
-              pending={configMutation.isPending}
-              empty={agency.paymentMethods.length === 0}
-              emptyTitle={t('settings.emptyMethods')}
-            >
-              {agency.paymentMethods.map((item) => (
-                <ConfigRow
-                  key={item.id}
-                  title={item.name}
-                  onEdit={() => setMethodDraft({ id: item.id, name: item.name })}
-                  onDelete={() => setDeleteTarget({ type: 'method', id: item.id, name: item.name })}
-                />
-              ))}
-            </ConfigEditor>
+            <div className="mb-3 grid gap-3 sm:grid-cols-[1fr_10rem_auto]">
+              <Input
+                value={methodDraft.name}
+                onChange={(event) => setMethodDraft((current) => ({ ...current, name: event.target.value }))}
+                placeholder={t('settings.itemName')}
+              />
+              <select
+                className="h-11 rounded-md border border-input bg-card px-3 text-sm"
+                value={methodDraft.kind}
+                onChange={(event) =>
+                  setMethodDraft((current) => ({ ...current, kind: event.target.value as PaymentCategory }))
+                }
+              >
+                {PAYMENT_CATEGORIES.map((category) => (
+                  <option key={category} value={category}>
+                    {t(`settings.accountKinds.${category}`)}
+                  </option>
+                ))}
+              </select>
+              <div className="flex gap-2">
+                <Button
+                  disabled={configMutation.isPending || methodDraft.name.trim().length < 1}
+                  onClick={() => upsertNamed('payment', methodDraft, agency.paymentMethods)}
+                >
+                  {methodDraft.id ? t('common.save') : t('common.add')}
+                </Button>
+                {methodDraft.id ? (
+                  <Button variant="outline" onClick={() => setMethodDraft({ name: '', kind: 'cash' })}>
+                    {t('common.cancel')}
+                  </Button>
+                ) : null}
+              </div>
+            </div>
+            {agency.paymentMethods.length === 0 ? (
+              <EmptyState title={t('settings.emptyMethods')} />
+            ) : (
+              <ul className="divide-y divide-border rounded-lg border border-border">
+                {agency.paymentMethods.map((item) => (
+                  <ConfigRow
+                    key={item.id}
+                    title={`${item.name} · ${t(`settings.accountKinds.${item.kind}`)}`}
+                    onEdit={() => setMethodDraft({ id: item.id, name: item.name, kind: item.kind })}
+                    onDelete={() => setDeleteTarget({ type: 'method', id: item.id, name: item.name })}
+                  />
+                ))}
+              </ul>
+            )}
           </FormSection>
 
           <FormSection title={t('settings.receivingAccountsTitle')} description={t('settings.receivingAccountsBody')}>
@@ -287,18 +321,18 @@ export function SettingsPage() {
                 className="h-11 rounded-md border border-input bg-card px-3 text-sm"
                 value={accountDraft.kind}
                 onChange={(event) =>
-                  setAccountDraft((current) => ({ ...current, kind: event.target.value as ReceivingAccountKind }))
+                  setAccountDraft((current) => ({ ...current, kind: event.target.value as PaymentCategory }))
                 }
               >
-                <option value="cash">{t('settings.accountKinds.cash')}</option>
-                <option value="upi">{t('settings.accountKinds.upi')}</option>
-                <option value="bank">{t('settings.accountKinds.bank')}</option>
-                <option value="portal">{t('settings.accountKinds.portal')}</option>
-                <option value="other">{t('settings.accountKinds.other')}</option>
+                {PAYMENT_CATEGORIES.map((category) => (
+                  <option key={category} value={category}>
+                    {t(`settings.accountKinds.${category}`)}
+                  </option>
+                ))}
               </select>
               <div className="flex gap-2">
                 <Button
-                  disabled={configMutation.isPending}
+                  disabled={configMutation.isPending || accountDraft.name.trim().length < 1}
                   onClick={() => upsertNamed('receiving', accountDraft, agency.receivingAccounts)}
                 >
                   {accountDraft.id ? t('common.save') : t('common.add')}
@@ -564,48 +598,6 @@ export function SettingsPage() {
         }}
       />
     </PageContainer>
-  )
-}
-
-function ConfigEditor({
-  children,
-  draftName,
-  onDraftName,
-  onSave,
-  onCancelEdit,
-  editing,
-  pending,
-  empty,
-  emptyTitle,
-}: {
-  children: ReactNode
-  draftName: string
-  onDraftName: (value: string) => void
-  onSave: () => void
-  onCancelEdit: () => void
-  editing: boolean
-  pending: boolean
-  empty: boolean
-  emptyTitle: string
-}) {
-  const { t } = useTranslation()
-  return (
-    <div className="space-y-3">
-      <div className="flex flex-col gap-2 sm:flex-row">
-        <Input value={draftName} onChange={(event) => onDraftName(event.target.value)} placeholder={t('settings.itemName')} />
-        <div className="flex gap-2">
-          <Button disabled={pending} onClick={onSave}>
-            {editing ? t('common.save') : t('common.add')}
-          </Button>
-          {editing ? (
-            <Button variant="outline" onClick={onCancelEdit}>
-              {t('common.cancel')}
-            </Button>
-          ) : null}
-        </div>
-      </div>
-      {empty ? <EmptyState title={emptyTitle} /> : <ul className="divide-y divide-border rounded-lg border border-border">{children}</ul>}
-    </div>
   )
 }
 

@@ -1,6 +1,6 @@
 # Database Schema
 
-Status: Phase 1 foundation live for `users`, `settings/agency`, `settings/bootstrap`, `auditLogs`, plus admin-configured `locations`, `products`, and `priceRules`. Phase 2 live for `customers` and `customerImportBatches`. Remaining collections stay proposed until their phase.
+Status: Phase 1 foundation live for `users`, `settings/agency`, `settings/bootstrap`, `auditLogs`, plus admin-configured `locations`, `products`, and `priceRules`. Phase 2 live for `customers` and `customerImportBatches`. Phase 3 live for godown `transactions` (`godown_sale`, `empty_return`), empty-cylinder `obligations`, and `idempotencyRecords` (Functions-only). Financial/inventory ledgers remain deferred to later phases.
 
 Firestore is the system of record. Security Rules allow clients to read what their role permits and deny client writes to privileged collections. Cloud Functions using the Admin SDK perform those writes inside Firestore transactions.
 

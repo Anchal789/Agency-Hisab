@@ -2,6 +2,51 @@
 
 ## Unreleased
 
+### 2026-11-11 — Phase 3 clickable empty-return history
+
+- Godown register “returned later” summary opens a return-history dialog for that exact sale (`originTransactionId`).
+- Dialog lists each partial return separately with date, quantity, customer, note, recorded time/staff, and sale summary totals.
+
+### 2026-11-11 — Phase 3 empty-return modal and register relationship
+
+- Replaced overlapping confirmation + floating form with a single Record Empty Return dialog that includes sale context and partial-return validation.
+- Godown register cylinder column shows original due, later returns, and remaining for sales; return rows show “against sale” date/link and remaining after return.
+- Empty returns now denormalize `originBusinessDate` and `remainingOutstandingAfter` without rewriting the original sale.
+
+### 2026-11-10 — Phase 3 createGodownSale null optional fields
+
+- Shared godown schema now accepts `null` for optional strings (`customCustomerName`, `note`) because Firebase httpsCallable serializes omitted/undefined values as null.
+- Frontend sale payload sends `null` for unused optional strings instead of `undefined`.
+- Regression tests cover registered/custom customer combinations and the reported failing payload shape.
+
+### 2026-11-10 — Phase 3 payment method/destination category mapping
+
+- Canonical payment categories: `cash`, `upi`, `bank`, `indane_portal`, `other` for both Settings payment methods and destinations.
+- Legacy `portal` / `Online` / `Portal` names normalized on read; Godown filters destinations by matching `kind`.
+- Settings payment methods now require a category; Cloud Functions persist normalized kinds.
+
+### 2026-11-10 — Phase 3 remove Booking name
+
+- Removed Booking name from godown create/edit forms, detail display, payloads, schemas, and Cloud Function writes.
+- Booking / No Booking status remains. Legacy `bookingName` on older transactions is still readable; new writes omit it.
+
+### 2026-11-10 — Phase 3 payment form and godown submit fixes
+
+- Godown payment inputs are Amount Received + Amount Due; Total Sale Amount is calculated (received + due) and stored as `salePaise`.
+- Payment destinations are filtered by Settings receiving-account kind matched to the selected payment method; incompatible destinations clear on method change and are rejected by Cloud Functions.
+- Create/edit validation now surfaces a toast when the form is invalid (previously failed silently), and Functions return the first schema error message.
+- Unit tests updated for amount identity, destination filtering, booking, and payment cases.
+
+### 2026-11-07 — Phase 3 Godown Register and Daily Sales
+
+- Godown register UI: daily list, filters, search, summary totals, create/edit/detail, empty-return recording.
+- Registered and custom customers; booking / no-booking; configurable cylinder types, payment methods, and destinations from Settings.
+- Cloud Functions: `createGodownSale`, `updateGodownSale`, `reverseGodownSale`, `recordEmptyReturn` with idempotency, Asia/Kolkata business dates, and `approval: not_required`.
+- Empty-cylinder obligations for later returns; no inventory/financial ledger posting yet.
+- Permissions: `godown.view`, `godown.create`, `godown.edit`; admin-only reverse for today’s business date.
+- Firestore rules/indexes updated for godown reads; client writes still denied.
+- Unit/rules tests, typecheck, and production build validation. Not pushed or deployed.
+
 ### 2026-11-07 — Phase 2 Customer Master and Excel import
 
 - Customer list, detail, add, and edit with validation, duplicate consumer-number checks, and Asia/Kolkata date display.
