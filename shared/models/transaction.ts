@@ -3,6 +3,17 @@
 export const GODOWN_TRANSACTION_TYPES = ['godown_sale', 'empty_return'] as const
 export type GodownTransactionType = (typeof GODOWN_TRANSACTION_TYPES)[number]
 
+export const INVENTORY_TX_TYPES = [
+  'stock_opening',
+  'stock_receipt',
+  'stock_return_distributor',
+  'stock_transfer',
+  'stock_reconciliation',
+] as const
+export type InventoryTxType = (typeof INVENTORY_TX_TYPES)[number]
+
+export type OperationalTransactionType = GodownTransactionType | InventoryTxType
+
 export const TRANSACTION_STATUSES = ['posted', 'pending_approval', 'rejected', 'reversed'] as const
 export type TransactionStatus = (typeof TRANSACTION_STATUSES)[number]
 
@@ -43,7 +54,7 @@ export type GodownAmountsPaise = {
 
 export type TransactionDoc = {
   id: string
-  type: GodownTransactionType
+  type: OperationalTransactionType
   status: TransactionStatus
   approval: ApprovalState
   businessDate: string
@@ -75,6 +86,10 @@ export type TransactionDoc = {
    */
   remainingOutstandingAfter: number | null
   obligationId: string | null
+  /** True when godown posting wrote inventory ledger lines. */
+  inventoryApplied: boolean
+  /** Inventory-module payload for pending approval / display. */
+  inventoryPayload: Record<string, unknown> | null
   reversalOf: string | null
   reversedByTransactionId: string | null
   reverseReason: string | null
@@ -205,6 +220,14 @@ export function isGodownTransactionType(value: unknown): value is GodownTransact
   return value === 'godown_sale' || value === 'empty_return'
 }
 
+export function isInventoryTxType(value: unknown): value is InventoryTxType {
+  return (INVENTORY_TX_TYPES as readonly string[]).includes(String(value))
+}
+
+export function isOperationalTransactionType(value: unknown): value is OperationalTransactionType {
+  return isGodownTransactionType(value) || isInventoryTxType(value)
+}
+
 function asNonNegInt(value: unknown): number | null {
   return typeof value === 'number' && Number.isSafeInteger(value) && value >= 0 ? value : null
 }
@@ -257,7 +280,7 @@ function timestampToMs(value: unknown): number | null {
 }
 
 export function parseTransaction(id: string, data: Record<string, unknown>): TransactionDoc | null {
-  if (!isGodownTransactionType(data.type)) return null
+  if (!isOperationalTransactionType(data.type)) return null
   const status = TRANSACTION_STATUSES.includes(data.status as TransactionStatus) ? (data.status as TransactionStatus) : null
   const approval = APPROVAL_STATES.includes(data.approval as ApprovalState) ? (data.approval as ApprovalState) : null
   const businessDate = asString(data.businessDate)
@@ -327,6 +350,11 @@ export function parseTransaction(id: string, data: Record<string, unknown>): Tra
         : null,
     remainingOutstandingAfter: asNonNegInt(data.remainingOutstandingAfter),
     obligationId: typeof data.obligationId === 'string' && data.obligationId ? data.obligationId : null,
+    inventoryApplied: data.inventoryApplied === true,
+    inventoryPayload:
+      data.inventoryPayload && typeof data.inventoryPayload === 'object'
+        ? (data.inventoryPayload as Record<string, unknown>)
+        : null,
     reversalOf: typeof data.reversalOf === 'string' && data.reversalOf ? data.reversalOf : null,
     reversedByTransactionId:
       typeof data.reversedByTransactionId === 'string' && data.reversedByTransactionId

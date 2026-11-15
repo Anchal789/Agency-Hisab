@@ -58,6 +58,8 @@ function sampleSale(overrides: Partial<TransactionDoc> = {}): TransactionDoc {
     originBusinessDate: null,
     remainingOutstandingAfter: null,
     obligationId: 'ob1',
+    inventoryApplied: false,
+    inventoryPayload: null,
     reversalOf: null,
     reversedByTransactionId: null,
     reverseReason: null,

@@ -55,7 +55,7 @@ export function Sidebar({
       title: t('nav.records'),
       items: [
         { key: 'customers', to: '/customers', label: t('nav.customers'), icon: Users },
-        { key: 'inventory', label: t('nav.inventory'), icon: Boxes },
+        { key: 'inventory', to: '/inventory', label: t('nav.inventory'), icon: Boxes },
         { key: 'dues', label: t('nav.dues'), icon: Receipt },
         { key: 'approvals', label: t('nav.approvals'), icon: ClipboardCheck },
         { key: 'reports', label: t('nav.reports'), icon: ClipboardCheck },

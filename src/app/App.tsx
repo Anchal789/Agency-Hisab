@@ -8,6 +8,7 @@ import {
   canEditGodown,
   canViewCustomers,
   canViewGodown,
+  canViewInventory,
   defaultAuthenticatedPath,
 } from '@shared/rules/permissions'
 import { AppShell } from '@/app/layouts/AppShell'
@@ -34,6 +35,17 @@ import { GodownCreatePage } from '@/modules/godown/GodownCreatePage'
 import { GodownDetailPage } from '@/modules/godown/GodownDetailPage'
 import { GodownEditPage } from '@/modules/godown/GodownEditPage'
 import { GodownPage } from '@/modules/godown/GodownPage'
+import { InventoryAgentsPage } from '@/modules/inventory/InventoryAgentsPage'
+import { InventoryDashboardPage } from '@/modules/inventory/InventoryDashboardPage'
+import { InventoryLayout } from '@/modules/inventory/InventoryLayout'
+import { InventoryLedgerPage } from '@/modules/inventory/InventoryLedgerPage'
+import { InventoryLocationsPage } from '@/modules/inventory/InventoryLocationsPage'
+import { InventoryOpeningPage } from '@/modules/inventory/InventoryOpeningPage'
+import { InventoryPendingPage } from '@/modules/inventory/InventoryPendingPage'
+import { InventoryReceivePage } from '@/modules/inventory/InventoryReceivePage'
+import { InventoryReconcilePage } from '@/modules/inventory/InventoryReconcilePage'
+import { InventoryReportsPage } from '@/modules/inventory/InventoryReportsPage'
+import { InventoryTransferPage } from '@/modules/inventory/InventoryTransferPage'
 import { SettingsPage } from '@/modules/settings/SettingsPage'
 import { UsersPage } from '@/modules/users/UsersPage'
 import { missingFirebaseEnv } from '@/services/firebase/client'
@@ -92,6 +104,12 @@ function GodownEditGate() {
   return <PermissionRoute allow={allow} />
 }
 
+function InventoryViewGate() {
+  const { role, profile } = useAuth()
+  const allow = Boolean(role && profile && canViewInventory(role, profile.permissions))
+  return <PermissionRoute allow={allow} />
+}
+
 export function App() {
   if (missingFirebaseEnv().length > 0) {
     return (
@@ -138,6 +156,20 @@ export function App() {
                 <Route element={<GodownViewGate />}>
                   <Route path="godown" element={<GodownPage />} />
                   <Route path="godown/:transactionId" element={<GodownDetailPage />} />
+                </Route>
+                <Route element={<InventoryViewGate />}>
+                  <Route path="inventory" element={<InventoryLayout />}>
+                    <Route index element={<InventoryDashboardPage />} />
+                    <Route path="locations" element={<InventoryLocationsPage />} />
+                    <Route path="ledger" element={<InventoryLedgerPage />} />
+                    <Route path="opening" element={<InventoryOpeningPage />} />
+                    <Route path="receive" element={<InventoryReceivePage />} />
+                    <Route path="transfer" element={<InventoryTransferPage />} />
+                    <Route path="agents" element={<InventoryAgentsPage />} />
+                    <Route path="reconcile" element={<InventoryReconcilePage />} />
+                    <Route path="pending" element={<InventoryPendingPage />} />
+                    <Route path="reports" element={<InventoryReportsPage />} />
+                  </Route>
                 </Route>
                 <Route element={<SettingsGate />}>
                   <Route path="settings" element={<SettingsPage />} />

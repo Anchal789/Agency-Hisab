@@ -7,6 +7,10 @@ export const STAFF_PERMISSION_KEYS = [
   'godown.edit',
   'payments.create',
   'inventory.view',
+  'inventory.openingStock',
+  'inventory.transfer',
+  'inventory.receive',
+  'inventory.reconcile',
   'vehicles.record',
   'expenses.create',
   'reports.viewAssigned',
@@ -28,6 +32,10 @@ export function emptyPermissions(): PermissionMap {
     'godown.edit': false,
     'payments.create': false,
     'inventory.view': false,
+    'inventory.openingStock': false,
+    'inventory.transfer': false,
+    'inventory.receive': false,
+    'inventory.reconcile': false,
     'vehicles.record': false,
     'expenses.create': false,
     'reports.viewAssigned': false,
@@ -118,6 +126,36 @@ export function canReverseGodown(role: AppRole): boolean {
   return role === 'admin'
 }
 
+export function canViewInventory(role: AppRole, permissions: PermissionMap): boolean {
+  if (role === 'admin') return true
+  return hasStaffPermission(permissions, 'inventory.view')
+}
+
+export function canCreateInventoryOpening(role: AppRole, permissions: PermissionMap): boolean {
+  if (role === 'admin') return true
+  return hasStaffPermission(permissions, 'inventory.openingStock')
+}
+
+export function canCreateInventoryTransfer(role: AppRole, permissions: PermissionMap): boolean {
+  if (role === 'admin') return true
+  return hasStaffPermission(permissions, 'inventory.transfer')
+}
+
+export function canCreateInventoryReceive(role: AppRole, permissions: PermissionMap): boolean {
+  if (role === 'admin') return true
+  return hasStaffPermission(permissions, 'inventory.receive')
+}
+
+export function canCreateInventoryReconcile(role: AppRole, permissions: PermissionMap): boolean {
+  if (role === 'admin') return true
+  return hasStaffPermission(permissions, 'inventory.reconcile')
+}
+
+/** Phase 4 minimal inventory approval queue — administrators only. */
+export function canApproveInventory(role: AppRole): boolean {
+  return role === 'admin'
+}
+
 export function defaultAuthenticatedPath(role: AppRole, permissions: PermissionMap): string {
   return canAccessDashboard(role, permissions) ? '/' : '/account'
 }
@@ -142,6 +180,7 @@ export const IMPLEMENTED_NAV_MODULES: ReadonlySet<NavModuleKey> = new Set([
   'dashboard',
   'godown',
   'customers',
+  'inventory',
   'users',
   'settings',
 ])

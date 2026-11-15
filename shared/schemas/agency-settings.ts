@@ -2,6 +2,7 @@ import { z } from 'zod'
 import {
   AGENCY_CURRENCIES,
   AGENCY_TIMEZONES,
+  LOCATION_KINDS,
   normalizePaymentCategory,
   PAYMENT_CATEGORIES,
 } from '../models/agency-config'
@@ -48,6 +49,15 @@ export const updateAgencyProfileSchema = z.object({
   name: z.string().trim().min(2).max(120),
   timezone: z.enum(AGENCY_TIMEZONES),
   currency: z.enum(AGENCY_CURRENCIES),
+  inventoryCutoverDate: z
+    .union([
+      z
+        .string()
+        .trim()
+        .regex(/^\d{4}-\d{2}-\d{2}$/, 'Use YYYY-MM-DD.'),
+      z.null(),
+    ])
+    .optional(),
 })
 
 export const setPaymentMethodsSchema = z
@@ -65,7 +75,7 @@ export const setReceivingAccountsSchema = z
 export const upsertLocationSchema = z.object({
   id: optionalDocIdSchema,
   name: z.string().trim().min(2).max(80),
-  kind: z.enum(['godown', 'other']),
+  kind: z.enum(LOCATION_KINDS),
   active: z.boolean(),
 })
 

@@ -1,0 +1,16 @@
+export {
+  createStockOpeningSchema,
+  createStockReceiptSchema,
+  createStockReturnToDistributorSchema,
+  createStockTransferSchema,
+  createStockReconciliationSchema,
+  approveInventoryTransactionSchema,
+  rejectInventoryTransactionSchema,
+  type CreateStockOpeningInput,
+  type CreateStockReceiptInput,
+  type CreateStockReturnToDistributorInput,
+  type CreateStockTransferInput,
+  type CreateStockReconciliationInput,
+  type ApproveInventoryTransactionInput,
+  type RejectInventoryTransactionInput,
+} from '../../../shared/schemas/inventory'

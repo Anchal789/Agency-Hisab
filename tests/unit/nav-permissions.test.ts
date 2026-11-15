@@ -32,6 +32,8 @@ describe('navigation permission matrix', () => {
     expect(isNavModuleImplemented('dashboard')).toBe(true)
     expect(isNavModuleImplemented('users')).toBe(true)
     expect(isNavModuleImplemented('settings')).toBe(true)
+    expect(isNavModuleImplemented('inventory')).toBe(true)
+    expect(isNavModuleImplemented('godown')).toBe(true)
   })
 
   it('shows zero-permission staff no operational modules (account is outside this nav list)', () => {
@@ -74,6 +76,10 @@ describe('navigation permission matrix', () => {
       'godown.edit',
       'payments.create',
       'inventory.view',
+      'inventory.openingStock',
+      'inventory.transfer',
+      'inventory.receive',
+      'inventory.reconcile',
       'vehicles.record',
       'expenses.create',
       'reports.viewAssigned',

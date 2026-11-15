@@ -1,6 +1,6 @@
 # Database Schema
 
-Status: Phase 1 foundation live for `users`, `settings/agency`, `settings/bootstrap`, `auditLogs`, plus admin-configured `locations`, `products`, and `priceRules`. Phase 2 live for `customers` and `customerImportBatches`. Phase 3 live for godown `transactions` (`godown_sale`, `empty_return`), empty-cylinder `obligations`, and `idempotencyRecords` (Functions-only). Financial/inventory ledgers remain deferred to later phases.
+Status: Phase 1 foundation live for `users`, `settings/agency`, `settings/bootstrap`, `auditLogs`, plus admin-configured `locations`, `products`, and `priceRules`. Phase 2 live for `customers` and `customerImportBatches`. Phase 3 live for godown `transactions` (`godown_sale`, `empty_return`), empty-cylinder `obligations`, and `idempotencyRecords` (Functions-only). Phase 4 live for `inventoryLedger`, `inventoryBalances`, `inventoryOpenings`, inventory transaction types, and forward-only godown inventory posting after cutover. Financial ledgers remain deferred to Phase 5.
 
 Firestore is the system of record. Security Rules allow clients to read what their role permits and deny client writes to privileged collections. Cloud Functions using the Admin SDK perform those writes inside Firestore transactions.
 
@@ -37,6 +37,7 @@ Single document.
 - `name`, `timezone` (default `Asia/Kolkata`), `currency` (`INR`)
 - `paymentMethods[]`, `receivingAccounts[]`
 - `expenseCategories[]`, `inventoryStates[]`
+- `inventoryCutoverDate` (`YYYY-MM-DD` | null) — forward-only gate for godown inventory posting
 - `negativeStockAllowed` (default false)
 - `historicalCorrectionRequiresSecondAdmin` (default false until Phase 7)
 
@@ -61,11 +62,11 @@ Phase 6 adds commission and statement views. The collection can exist earlier on
 
 ### `locations/{locationId}`
 
-- `name`, `kind` (`godown` | `vehicle` | `agent` | `other`)
+- `name`, `kind` (`godown` | `vehicle` | `agent` | `csc` | `other`)
 - `agentId`, `vehicleId` when applicable
 - `active`
 
-Seeded with one Godown location when inventory work starts, not with fake stock.
+Configured in Settings. Phase 4 tracks agent/CSC stock as balances at locations of those kinds (no Phase 6 agent/vehicle master apps).
 
 ### `products/{productId}`
 
@@ -110,7 +111,7 @@ Customer import writes customers only. It does not write `transactions` or ledge
 
 Central business event.
 
-- `type` (examples: `godown_sale`, `customer_payment`, `empty_return`, `stock_receipt`, `stock_transfer`, `expense`, `new_connection`, `reversal`, `historical_correction`)
+- `type` (examples: `godown_sale`, `customer_payment`, `empty_return`, `stock_opening`, `stock_receipt`, `stock_return_distributor`, `stock_transfer`, `stock_reconciliation`, `expense`, `new_connection`, `reversal`, `historical_correction`)
 - `status` (`posted` | `pending_approval` | `rejected` | `reversed`)
 - `businessDate`, `timezone`
 - `customerId` optional, `customerSnapshot` (name, consumer number, address, city at posting time)
@@ -123,18 +124,21 @@ Central business event.
 - `idempotencyKey`
 - `createdBy`, `createdAt`
 - `approval` (`not_required` | `pending` | `approved` | `rejected`)
+- `inventoryApplied` (boolean) when a godown txn wrote inventory ledger lines
 - `reversalOf`, `reversedBy` optional
 - `correctionId` optional
 
-Godown sales use `approval: not_required` and `status: posted` in the same write.
+Godown sales use `approval: not_required` and `status: posted` in the same write. Staff inventory creates use `pending_approval` until admin approve/reject.
 
 ### `inventoryLedger/{entryId}`
 
 - `transactionId`, `businessDate`
-- `locationId`, `productId`, `state` (`filled` | `empty` | `damaged` | configurable)
+- `locationId`, `productId`, `state` (`filled` | `empty` | `damaged`)
 - `quantityDelta` (signed integer)
 - `sourceLocationId`, `destinationLocationId`
-- `movementType`
+- `movementType` (`opening`, `distributor_receipt`, `distributor_return`, `transfer_out`, `transfer_in`, `customer_sale`, `empty_received_at_sale`, `empty_return`, `adjustment`, `damaged`)
+- `createdBy`, `createdAt`
+- Deterministic ids where useful: `{transactionId}_{locationId}_{productId}_{state}_{seq}`
 
 A transfer is two linked entries (out and in) with the same `transactionId` and no revenue.
 
@@ -142,6 +146,13 @@ A transfer is two linked entries (out and in) with the same `transactionId` and 
 
 - `quantity` integer
 - `updatedAt`, `updatedByTransactionId`
+- Absence is not zero. UI shows “Opening stock not recorded” when no opening exists for that location+product.
+
+### `inventoryOpenings/{locationId}_{productId}`
+
+Phase 4 uniqueness guard: at most one posted opening per location+product.
+
+- `openingTransactionId`, `businessDate`, `createdBy`, `createdAt`
 
 ### `financialLedger/{entryId}`
 
@@ -226,12 +237,12 @@ Phase 8. Who triggered it, scope, storage path, status. A backup record is not e
 
 ## Indexes
 
-Composite indexes will be added with the feature that queries them. Expected first indexes:
+Composite indexes in `firestore.indexes.json` (deploy with Console/CLI when ready; do not assume emulator auto-creates all):
 
-- `customers`: `status` + `consumerNumber`; array-contains on `searchTokens` with `status`
-- `transactions`: `type` + `businessDate`; `businessDate` + `status`; `customerId` + `businessDate`
-- `obligations`: `customerId` + `kind` + `status`
-- `approvalRequests`: `decision` + `submittedAt`
+- `customers`: `searchTokens` CONTAINS + `displayName`; `status` + `displayName`
+- `transactions`: `businessDate` + `createdAt`; `type` + `originTransactionId`; `status` + `type` + `createdAt` (inventory pending queue)
+- `inventoryLedger`: `businessDate` + `createdAt`; `locationId` + `businessDate`; `transactionId` + `createdAt`
+- `inventoryBalances`: `locationId` + `productId`
 
 Customer search keeps `consumerNumber` as a string. Prefix search uses `searchTokens` (full value plus bounded prefixes), not a scan of the collection.
 

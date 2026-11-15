@@ -9,8 +9,17 @@ export type PaymentCategory = (typeof PAYMENT_CATEGORIES)[number]
 /** @deprecated Prefer PaymentCategory — kept as an alias for existing imports. */
 export type ReceivingAccountKind = PaymentCategory
 
-export type LocationKind = 'godown' | 'other'
+export const LOCATION_KINDS = ['godown', 'vehicle', 'agent', 'csc', 'other'] as const
+export type LocationKind = (typeof LOCATION_KINDS)[number]
 export type ProductKind = 'cylinder' | 'accessory' | 'other'
+
+export const LOCATION_KIND_LABELS: Record<LocationKind, string> = {
+  godown: 'Godown',
+  vehicle: 'Vehicle',
+  agent: 'Agent',
+  csc: 'CSC point',
+  other: 'Other',
+}
 
 export type NamedConfigItem = {
   id: string
@@ -34,6 +43,8 @@ export type AgencySettingsDoc = {
   receivingAccounts: ReceivingAccount[]
   expenseCategories: NamedConfigItem[]
   inventoryStates: string[]
+  /** YYYY-MM-DD; null until inventory opening cutover is established. */
+  inventoryCutoverDate: string | null
   negativeStockAllowed: boolean
   historicalCorrectionRequiresSecondAdmin: boolean
 }
@@ -186,14 +197,28 @@ export function parseAgencySettings(data: Record<string, unknown> | undefined): 
     inventoryStates: Array.isArray(source.inventoryStates)
       ? source.inventoryStates.filter((value): value is string => typeof value === 'string')
       : ['filled', 'empty', 'damaged'],
+    inventoryCutoverDate:
+      typeof source.inventoryCutoverDate === 'string' && /^\d{4}-\d{2}-\d{2}$/.test(source.inventoryCutoverDate)
+        ? source.inventoryCutoverDate
+        : null,
     negativeStockAllowed: source.negativeStockAllowed === true,
     historicalCorrectionRequiresSecondAdmin: source.historicalCorrectionRequiresSecondAdmin === true,
   }
 }
 
+export function isLocationKind(value: unknown): value is LocationKind {
+  return (
+    value === 'godown' ||
+    value === 'vehicle' ||
+    value === 'agent' ||
+    value === 'csc' ||
+    value === 'other'
+  )
+}
+
 export function parseLocation(id: string, data: Record<string, unknown>): LocationDoc | null {
   const name = typeof data.name === 'string' ? data.name.trim() : ''
-  const kind = data.kind === 'godown' || data.kind === 'other' ? data.kind : null
+  const kind = isLocationKind(data.kind) ? data.kind : null
   if (!name || !kind) return null
   return { id, name, kind, active: data.active !== false }
 }

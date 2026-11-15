@@ -45,6 +45,10 @@ service cloud.firestore {
       return isAdmin() || staffPermissionTrue('godown.view');
     }
 
+    function canViewInventory() {
+      return isAdmin() || staffPermissionTrue('inventory.view');
+    }
+
     // Registered godown sales need customer master lookup without granting the Customers module.
     function canReadCustomerMaster() {
       return canViewCustomers() || canViewGodown();
@@ -121,7 +125,8 @@ service cloud.firestore {
     // and inventory/finance mutations must go through Cloud Functions.
     // -------------------------------------------------------------------------
     match /transactions/{id} {
-      allow read: if canViewGodown();
+      // Godown and inventory modules both read transactions (inventory pending queue / ledger links).
+      allow read: if canViewGodown() || canViewInventory();
       allow create, update, delete: if false;
     }
 
@@ -140,12 +145,17 @@ service cloud.firestore {
     }
 
     match /inventoryLedger/{id} {
-      allow read: if isActiveAgencyUser();
+      allow read: if canViewInventory();
       allow create, update, delete: if false;
     }
 
     match /inventoryBalances/{id} {
-      allow read: if isActiveAgencyUser();
+      allow read: if canViewInventory();
+      allow create, update, delete: if false;
+    }
+
+    match /inventoryOpenings/{id} {
+      allow read: if canViewInventory();
       allow create, update, delete: if false;
     }
 

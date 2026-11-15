@@ -2,6 +2,29 @@
 
 ## Unreleased
 
+### 2026-11-14 — createStockOpening INTERNAL after emulator reset
+
+- Root cause: Firestore transaction wrote the opening guard, then `maybeSetCutoverDateInTx` read agency — illegal read-after-write → INTERNAL.
+- Fix: split inventory post/approve into prepare (reads) then commit (writes); cutover uses a prior agency read + write-only helper.
+- Missing agency/location/product/user profile now return clear `failed-precondition` / `invalid-argument` messages; opening never invents those docs.
+- Documented emulator re-init: `bootstrap:admin` → Settings locations/products → opening stock.
+
+### 2026-11-12 — Phase 4 inventory screen redesign
+
+- Inventory navigation is grouped (overview, stock operations, tracking, reports) with a section menu on small screens.
+- Dashboard, location stock, opening, distributor, transfer, agent/CSC, ledger, physical count, pending approval, and reports now follow daily stock workflows.
+- Opening stock can include several cylinder types, with a review step. Transfers show available stock and keep each cylinder condition as its own saved transfer.
+- Unrecorded opening stock stays “Not recorded” instead of a zero.
+
+### 2026-11-11 — Phase 4 Inventory Management
+
+- Inventory module: opening stock, distributor receive/return, transfer, reconciliation, agent/CSC balances, ledger, reports, and admin pending-approval queue.
+- Shared models/schemas; location kinds include `vehicle`, `agent`, `csc`; agency `inventoryCutoverDate` for forward-only cutover (no historical backfill).
+- Cloud Functions post ledger + balances atomically; staff creates stay `pending_approval` until admin approve/reject; godown sale/return/reverse write inventory only when cutover + opening exist.
+- Empty return accepts optional receive `locationId` (defaults to original sale location).
+- Firestore rules/indexes for inventory collections and pending inventory queries; client writes denied.
+- Dashboard filled-stock card reads real balances when openings exist. Unit/rules tests updated. Not pushed or deployed.
+
 ### 2026-11-11 — Phase 3 clickable empty-return history
 
 - Godown register “returned later” summary opens a return-history dialog for that exact sale (`originTransactionId`).

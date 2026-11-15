@@ -331,6 +331,55 @@ describe('Firestore security rules', () => {
     })
   })
 
+  describe('inventory collections', () => {
+    it('allows inventory.view staff to read inventory ledger/balances/openings and pending inventory txs; denies others and all client writes', async () => {
+      await testEnv.withSecurityRulesDisabled(async (context) => {
+        const db = context.firestore()
+        await setDoc(doc(db, 'users/staff_inventory'), {
+          phoneE164: '+919800000006',
+          authEmail: '918000000006@users.hisab.internal',
+          displayName: 'Inventory',
+          role: 'staff',
+          status: 'active',
+          permissions: { 'inventory.view': true },
+          language: 'en',
+          mustChangePassword: false,
+          createdBy: 'admin1',
+        })
+        await setDoc(doc(db, 'inventoryOpenings/g1_p1'), {
+          locationId: 'godown1',
+          productId: 'cyl1',
+          openingTransactionId: 'tx_open',
+          businessDate: '2026-11-11',
+          createdBy: 'admin1',
+        })
+        await setDoc(doc(db, 'transactions/tx_inv_pending'), {
+          type: 'stock_opening',
+          status: 'pending_approval',
+          approval: 'pending',
+          createdBy: 'staff_inventory',
+        })
+      })
+
+      const inventoryView = testEnv.authenticatedContext('staff_inventory', { role: 'staff' })
+      const customersOnly = testEnv.authenticatedContext('staff1', { role: 'staff' })
+      const admin = testEnv.authenticatedContext('admin1', { role: 'admin' })
+
+      await assertSucceeds(getDoc(doc(inventoryView.firestore(), 'inventoryLedger/il1')))
+      await assertSucceeds(getDoc(doc(inventoryView.firestore(), 'inventoryBalances/godown_filled')))
+      await assertSucceeds(getDoc(doc(inventoryView.firestore(), 'inventoryOpenings/g1_p1')))
+      await assertSucceeds(getDoc(doc(inventoryView.firestore(), 'transactions/tx_inv_pending')))
+
+      await assertFails(getDoc(doc(customersOnly.firestore(), 'inventoryLedger/il1')))
+      await assertFails(getDoc(doc(customersOnly.firestore(), 'inventoryBalances/godown_filled')))
+      await assertFails(getDoc(doc(customersOnly.firestore(), 'inventoryOpenings/g1_p1')))
+
+      await assertFails(setDoc(doc(inventoryView.firestore(), 'inventoryLedger/il_hack'), { quantityDelta: 1 }))
+      await assertFails(updateDoc(doc(admin.firestore(), 'inventoryBalances/godown_filled'), { quantity: 0 }))
+      await assertFails(setDoc(doc(admin.firestore(), 'inventoryOpenings/hack'), { locationId: 'x' }))
+    })
+  })
+
   describe('unmatched paths', () => {
     it('denies reads and writes to unknown collections', async () => {
       const admin = testEnv.authenticatedContext('admin1', { role: 'admin' })

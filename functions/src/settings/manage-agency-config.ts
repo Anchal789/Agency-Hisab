@@ -42,12 +42,13 @@ export const manageAgencyConfig = functions
     const action = parsed.data.action
 
     if (action === 'updateProfile') {
-      const { name, timezone, currency } = parsed.data.payload
+      const { name, timezone, currency, inventoryCutoverDate } = parsed.data.payload
       await agencyRef.set(
         {
           name,
           timezone,
           currency,
+          ...(inventoryCutoverDate !== undefined ? { inventoryCutoverDate } : {}),
           updatedAt: FieldValue.serverTimestamp(),
           updatedBy: actorUid,
         },

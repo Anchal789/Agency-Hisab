@@ -38,7 +38,11 @@ import { getFirebase } from '@/services/firebase/client'
 
 type DraftNamed = { id?: string; name: string; kind: PaymentCategory }
 type DraftAccount = { id?: string; name: string; kind: PaymentCategory }
-type DraftLocation = { id?: string; name: string; kind: 'godown' | 'other' }
+type DraftLocation = {
+  id?: string
+  name: string
+  kind: 'godown' | 'vehicle' | 'agent' | 'csc' | 'other'
+}
 type DraftProduct = { id?: string; name: string; code: string; kind: 'cylinder' | 'accessory' | 'other'; unit: string }
 type DraftPrice = { id?: string; productId: string; label: string; amountRupees: string }
 
@@ -49,6 +53,7 @@ export function SettingsPage() {
   const [agencyName, setAgencyName] = useState('')
   const [timezone, setTimezone] = useState('Asia/Kolkata')
   const [currency, setCurrency] = useState('INR')
+  const [inventoryCutoverDate, setInventoryCutoverDate] = useState('')
   const [methodDraft, setMethodDraft] = useState<DraftNamed>({ name: '', kind: 'cash' })
   const [accountDraft, setAccountDraft] = useState<DraftAccount>({ name: '', kind: 'cash' })
   const [locationDraft, setLocationDraft] = useState<DraftLocation>({ name: '', kind: 'godown' })
@@ -74,6 +79,7 @@ export function SettingsPage() {
       setAgencyName(parsed.name)
       setTimezone(parsed.timezone)
       setCurrency(parsed.currency)
+      setInventoryCutoverDate(parsed.inventoryCutoverDate ?? '')
       return parsed
     },
   })
@@ -245,14 +251,28 @@ export function SettingsPage() {
                   <option value="INR">INR</option>
                 </select>
               </FormField>
+              <FormField label={t('settings.inventoryCutoverDate')} htmlFor="inventory-cutover">
+                <Input
+                  id="inventory-cutover"
+                  type="date"
+                  value={inventoryCutoverDate}
+                  onChange={(event) => setInventoryCutoverDate(event.target.value)}
+                />
+              </FormField>
             </div>
+            <p className="mt-2 text-xs text-muted-foreground">{t('settings.inventoryCutoverHint')}</p>
             <Button
               className="mt-4"
               disabled={configMutation.isPending || agencyName.trim().length < 2}
               onClick={() =>
                 configMutation.mutate({
                   action: 'updateProfile',
-                  payload: { name: agencyName.trim(), timezone: timezone as 'Asia/Kolkata', currency: currency as 'INR' },
+                  payload: {
+                    name: agencyName.trim(),
+                    timezone: timezone as 'Asia/Kolkata',
+                    currency: currency as 'INR',
+                    inventoryCutoverDate: inventoryCutoverDate.trim() ? inventoryCutoverDate.trim() : null,
+                  },
                 })
               }
             >
@@ -371,10 +391,16 @@ export function SettingsPage() {
                 className="h-11 rounded-md border border-input bg-card px-3 text-sm"
                 value={locationDraft.kind}
                 onChange={(event) =>
-                  setLocationDraft((current) => ({ ...current, kind: event.target.value as 'godown' | 'other' }))
+                  setLocationDraft((current) => ({
+                    ...current,
+                    kind: event.target.value as DraftLocation['kind'],
+                  }))
                 }
               >
                 <option value="godown">{t('settings.locationKinds.godown')}</option>
+                <option value="vehicle">{t('settings.locationKinds.vehicle')}</option>
+                <option value="agent">{t('settings.locationKinds.agent')}</option>
+                <option value="csc">{t('settings.locationKinds.csc')}</option>
                 <option value="other">{t('settings.locationKinds.other')}</option>
               </select>
               <Button

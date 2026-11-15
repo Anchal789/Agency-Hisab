@@ -1,6 +1,6 @@
 # Development Phases
 
-Status: Phase 3 Godown Register and Daily Sales implemented locally. Awaiting manual testing and approval before Phase 4. Do not push or deploy without approval.
+Status: Phase 4 Inventory Management implemented locally. Awaiting manual testing and approval before Phase 5. Do not push or deploy without approval.
 
 Work proceeds in order. A phase starts only after the product owner sends:
 
@@ -68,7 +68,7 @@ Implemented locally (awaiting manual smoke approval before Phase 4):
 - Admin-only reverse/delete for today’s Asia/Kolkata business date (two confirmations + reason)
 - Permissions: `godown.view`, `godown.create`, `godown.edit`; delete/reverse admin-only
 - Cloud Functions: `createGodownSale`, `updateGodownSale`, `reverseGodownSale`, `recordEmptyReturn`
-- Minimum schema for Phase 4/5: empty-cylinder `obligations` and money fields on transactions; inventory/financial ledgers not posted yet
+- Minimum schema for Phase 5: money fields on transactions; financial ledgers not posted yet. Phase 4 now posts inventory when cutover + opening exist.
 
 Out of scope for Phase 3: inventory UI/reconciliation, customer dues UI, financial ledger posting, expenses, agents/vehicles.
 
@@ -83,9 +83,49 @@ Out of scope for Phase 3: inventory UI/reconciliation, customer dues UI, financi
 | `npm run build:functions` | Passed |
 | `npm run test:rules` (15 rules tests, emulator) | Passed |
 
-## Phase 4 — Inventory and empty-cylinder obligations
+## Phase 4 — Inventory Management
 
-Not started.
+Implemented locally (awaiting manual smoke approval before Phase 5):
+
+- Shared inventory models/schemas; location kinds `godown | vehicle | agent | csc | other`; `settings/agency.inventoryCutoverDate`
+- Collections: `inventoryLedger`, `inventoryBalances`, `inventoryOpenings` (Functions-only writes)
+- Cloud Functions: opening, receipt, return-to-distributor, transfer, reconciliation, approve, reject
+- Forward-only godown sale/return/reverse inventory when cutover set, date ≥ cutover, and opening exists
+- Empty-return optional receive `locationId` (defaults to sale location)
+- Staff inventory creates → `pending_approval`; admin posts immediately; minimal `/inventory/pending` queue
+- Inventory UI routes under `/inventory/*`; Settings cutover + location kinds; dashboard filled stock when openings exist
+- Permissions: `inventory.view`, `inventory.openingStock`, `inventory.transfer`, `inventory.receive`, `inventory.reconcile`
+- Firestore rules/indexes for inventory reads and pending queue; client writes denied
+- Unit/rules tests, typecheck, and production build validation. Not pushed or deployed.
+
+### Phase 4 validation (local)
+
+| Check | Result |
+| --- | --- |
+| `npm run typecheck` | Passed |
+| `npm --prefix functions run typecheck` | Passed |
+| `npm test` (120 unit tests) | Passed |
+| `npm run build` | Passed |
+| `npm run build:functions` | Passed |
+| `npm run test:rules` (16 rules tests, emulator) | Passed |
+
+### Emulator re-init after Firestore clear
+
+1. `npm run bootstrap:admin` (restores admin profile + default agency settings).
+2. Settings: active location(s) and cylinder product(s).
+3. Then Inventory → Opening. See `docs/AUTHENTICATION.md` § Emulator reset.
+
+### Phase 4 manual smoke checklist
+
+1. Settings: create vehicle/agent/CSC locations; set inventory cutover date (or leave blank and let first opening set it).
+2. Inventory → Opening: record opening for godown + cylinder product; confirm balances appear (not “Unavailable”).
+3. Staff with `inventory.receive` creates a receipt → appears in Pending; admin approve → balances update; reject with reason → no stock change.
+4. Transfer between two locations; confirm ledger has out+in lines and balances net correctly.
+5. Reconciliation with variance → adjustment ledger lines + reason.
+6. After cutover + opening: create godown sale → filled decreases / empty received increases; empty return with alternate receive location → empty increases there.
+7. Sale before cutover or without opening → no inventory lines (`inventoryApplied` false).
+8. Dashboard filled-stock card shows real total when openings exist.
+9. Hindi/English inventory nav and permission labels render.
 
 ## Phase 5 — Payments, customer dues, and expenses
 

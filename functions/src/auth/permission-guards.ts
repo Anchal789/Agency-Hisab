@@ -15,7 +15,13 @@ export async function requirePermission(context: CallableContext, permission: St
     throw new functions.https.HttpsError('permission-denied', 'You do not have permission to do that.')
   }
   const snapshot = await getFirestore().collection('users').doc(uid).get()
-  if (!snapshot.exists || snapshot.data()?.status === 'disabled') {
+  if (!snapshot.exists) {
+    throw new functions.https.HttpsError(
+      'failed-precondition',
+      'User profile is missing. After an emulator reset, run npm run bootstrap:admin, or ask an administrator to recreate your staff account.',
+    )
+  }
+  if (snapshot.data()?.status === 'disabled') {
     throw new functions.https.HttpsError('permission-denied', 'You do not have permission to do that.')
   }
   const permissions = normalizePermissions(snapshot.data()?.permissions)

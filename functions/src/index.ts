@@ -11,6 +11,15 @@ import {
   reverseGodownSale,
   updateGodownSale,
 } from './godown/post-godown'
+import {
+  approveInventoryTransaction,
+  createStockOpening,
+  createStockReceipt,
+  createStockReconciliation,
+  createStockReturnToDistributor,
+  createStockTransfer,
+  rejectInventoryTransaction,
+} from './inventory/post-inventory'
 import { manageAgencyConfig } from './settings/manage-agency-config'
 
 initializeApp()
@@ -29,4 +38,11 @@ export {
   updateGodownSale,
   reverseGodownSale,
   recordEmptyReturn,
+  createStockOpening,
+  createStockReceipt,
+  createStockReturnToDistributor,
+  createStockTransfer,
+  createStockReconciliation,
+  approveInventoryTransaction,
+  rejectInventoryTransaction,
 }

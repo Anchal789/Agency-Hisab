@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react'
 import { useTranslation } from 'react-i18next'
 import { formatBusinessDate } from '@shared/calculations/business-date'
+import type { LocationDoc } from '@shared/models/agency-config'
 import { saleEmptyCylinderBreakdown, type TransactionDoc } from '@shared/models/transaction'
 import { FormField } from '@/components/forms/FormField'
 import { Button } from '@/components/ui/button'
@@ -11,11 +12,13 @@ export type EmptyReturnFormValues = {
   emptyReturned: string
   businessDate: string
   note: string
+  locationId: string | null
 }
 
 export function EmptyReturnDialog({
   open,
   sale,
+  locations,
   defaultBusinessDate,
   pending,
   onOpenChange,
@@ -23,6 +26,7 @@ export function EmptyReturnDialog({
 }: {
   open: boolean
   sale: TransactionDoc | null
+  locations: LocationDoc[]
   defaultBusinessDate: string
   pending: boolean
   onOpenChange: (open: boolean) => void
@@ -32,18 +36,26 @@ export function EmptyReturnDialog({
   const [emptyReturned, setEmptyReturned] = useState('1')
   const [businessDate, setBusinessDate] = useState(defaultBusinessDate)
   const [note, setNote] = useState('')
+  const [locationId, setLocationId] = useState('')
   const [fieldError, setFieldError] = useState<string | null>(null)
 
   const breakdown = sale ? saleEmptyCylinderBreakdown(sale.quantities) : null
   const outstanding = breakdown?.remainingDue ?? 0
+  const activeLocations = locations.filter((row) => row.active)
 
   useEffect(() => {
     if (!open) return
+    const fallbackLocation =
+      sale?.locationId && activeLocations.some((row) => row.id === sale.locationId)
+        ? sale.locationId
+        : (activeLocations[0]?.id ?? '')
     setEmptyReturned(outstanding > 0 ? '1' : '')
     setBusinessDate(defaultBusinessDate)
     setNote('')
+    setLocationId(fallbackLocation)
     setFieldError(null)
-  }, [open, defaultBusinessDate, outstanding, sale?.id])
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- reset only when dialog opens or sale/date changes
+  }, [open, defaultBusinessDate, outstanding, sale?.id, sale?.locationId])
 
   function handleOpenChange(next: boolean) {
     if (pending) return
@@ -70,6 +82,7 @@ export function EmptyReturnDialog({
       emptyReturned: String(qty),
       businessDate,
       note,
+      locationId: locationId.trim() || null,
     })
   }
 
@@ -136,6 +149,21 @@ export function EmptyReturnDialog({
               })}
             </p>
           ) : null}
+          <FormField label={t('godown.receiveLocation')}>
+            <select
+              className="h-11 w-full rounded-md border border-input bg-card px-3 text-sm"
+              value={locationId}
+              disabled={pending || activeLocations.length === 0}
+              onChange={(event) => setLocationId(event.target.value)}
+            >
+              {activeLocations.map((row) => (
+                <option key={row.id} value={row.id}>
+                  {row.name}
+                </option>
+              ))}
+            </select>
+            <p className="mt-1 text-xs text-muted-foreground">{t('godown.receiveLocationHint')}</p>
+          </FormField>
           <FormField label={t('godown.returnTransactionDate')}>
             <Input
               type="date"

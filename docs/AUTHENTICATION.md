@@ -55,6 +55,20 @@ Permission edits are administrator-only via the `updateStaffAccess` Cloud Functi
 - Existing email-based admin (preserve UID): `npm run migrate:admin-phone` with `INITIAL_ADMIN_PHONE`.
 - Optional password rotation during migration: `MIGRATE_SET_PASSWORD`.
 
+## Emulator reset / empty Firestore
+
+Clearing Firestore emulator data removes `users`, `settings/agency`, `settings/bootstrap`, locations, products, and inventory docs. Auth emulator users/claims may still exist.
+
+Required re-init (local only; does not touch production):
+
+1. Ensure Auth + Firestore + Functions emulators are running.
+2. Run `npm run bootstrap:admin` — recreates the admin Auth link (or creates the user), `users/{uid}`, `settings/bootstrap`, and default `settings/agency` when missing.
+3. Sign in as that admin. If the UI shows access denied, sign out/in once so the session picks up the restored profile and custom claim.
+4. In Settings, create at least one active **location** and one active **cylinder** product (plus payment methods/destinations if you will test godown sales).
+5. Then record opening stock. Inventory callables refuse missing agency/location/product with clear errors; they never invent those documents.
+
+Do not delete more emulator data while debugging a failed stock call — inspect the stack trace and prerequisites first.
+
 ## Google Password Manager
 
 Login form uses:

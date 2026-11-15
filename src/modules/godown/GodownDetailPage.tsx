@@ -1,9 +1,11 @@
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
+import { collection, getDocs, orderBy, query } from 'firebase/firestore'
 import { useRef, useState } from 'react'
 import { Link, useNavigate, useParams } from 'react-router'
 import { useTranslation } from 'react-i18next'
 import { toast } from 'sonner'
 import { AGENCY_TIME_ZONE, businessDateInTimeZone, formatBusinessDate } from '@shared/calculations/business-date'
+import { parseLocation, type LocationDoc } from '@shared/models/agency-config'
 import { formatPaise } from '@shared/models/money'
 import { saleEmptyCylinderBreakdown } from '@shared/models/transaction'
 import { canEditGodown, canReverseGodown, canCreateGodown } from '@shared/rules/permissions'
@@ -19,6 +21,7 @@ import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { newTransactionId, recordEmptyReturn, reverseGodownSale } from '@/services/api/godown'
 import { callableErrorMessage } from '@/services/errors'
+import { getFirebase } from '@/services/firebase/client'
 import { EmptyReturnDialog } from './EmptyReturnDialog'
 import { fetchEmptyReturnsForSale, fetchGodownTransaction } from './godown-query'
 
@@ -51,6 +54,16 @@ export function GodownDetailPage() {
     queryKey: ['godown-returns', transactionId],
     queryFn: () => fetchEmptyReturnsForSale(transactionId),
     enabled: Boolean(transactionId) && txQuery.data?.type === 'godown_sale',
+  })
+
+  const locationsQuery = useQuery({
+    queryKey: ['settings', 'locations'],
+    queryFn: async () => {
+      const snapshot = await getDocs(query(collection(getFirebase().db, 'locations'), orderBy('name')))
+      return snapshot.docs
+        .map((row) => parseLocation(row.id, row.data() as Record<string, unknown>))
+        .filter((row): row is LocationDoc => row !== null)
+    },
   })
 
   const reverseMutation = useMutation({
@@ -335,6 +348,7 @@ export function GodownDetailPage() {
       <EmptyReturnDialog
         open={returnOpen}
         sale={tx?.type === 'godown_sale' ? tx : null}
+        locations={locationsQuery.data ?? []}
         defaultBusinessDate={today}
         pending={returnMutation.isPending}
         onOpenChange={setReturnOpen}
@@ -349,6 +363,7 @@ export function GodownDetailPage() {
             businessDate: values.businessDate,
             emptyReturned: Number(values.emptyReturned),
             note: values.note.trim() || null,
+            locationId: values.locationId,
           })
         }}
       />

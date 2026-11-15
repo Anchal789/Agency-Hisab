@@ -154,6 +154,8 @@ export const recordEmptyReturnSchema = z.object({
   originTransactionId: uuidLikeSchema,
   businessDate: isoDateSchema,
   emptyReturned: z.number().int().positive().max(100_000),
+  /** Receiving location; defaults to the origin sale location when omitted. */
+  locationId: z.string().trim().min(1).max(80).nullable().optional(),
   note: optionalNullableTrimmed(500),
 })
 

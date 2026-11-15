@@ -17,6 +17,14 @@ import {
 import { requireAdmin } from '../auth/guards'
 import { requirePermission } from '../auth/permission-guards'
 import {
+  applyLedgerAndBalancesInTx,
+  assertInventoryEligibleForGodown,
+  emptyReturnLedgerLines,
+  godownSaleLedgerLines,
+  loadBalanceMap,
+  reverseLedgerLines,
+} from '../inventory/apply-inventory'
+import {
   amountsFromReceivedAndDue,
   createGodownSaleSchema,
   derivedSaleQuantities,
@@ -253,6 +261,7 @@ export const createGodownSale = functions.region('asia-south1').https.onCall(asy
   }
   const input = parsed.data
   const saleFields = await buildSaleDocument(input, actorUid)
+  const { agency } = await loadAgencyLookups()
   const db = getFirestore()
   const txRef = db.collection('transactions').doc(input.transactionId)
   const idemRef = db.collection('idempotencyRecords').doc(input.idempotencyKey)
@@ -281,10 +290,45 @@ export const createGodownSale = functions.region('asia-south1').https.onCall(asy
     }
 
     const outstanding = saleFields.quantities.emptyOutstanding
+    const inventoryEligible = await assertInventoryEligibleForGodown(tx, {
+      businessDate: saleFields.businessDate,
+      locationId: saleFields.locationId,
+      productId: saleFields.productId,
+    })
+    const inventoryLines =
+      inventoryEligible && saleFields.locationId
+        ? godownSaleLedgerLines({
+            locationId: saleFields.locationId,
+            productId: saleFields.productId,
+            filledIssued: saleFields.quantities.filledIssued,
+            emptyReceived: saleFields.quantities.emptyReceived,
+          })
+        : []
+
+    if (inventoryLines.length > 0 && saleFields.locationId) {
+      const balances = await loadBalanceMap(
+        tx,
+        inventoryLines.map((line) => ({
+          locationId: line.locationId,
+          productId: line.productId,
+          state: line.state,
+        })),
+      )
+      applyLedgerAndBalancesInTx(tx, {
+        transactionId: txRef.id,
+        businessDate: saleFields.businessDate,
+        actorUid,
+        lines: inventoryLines,
+        currentBalances: balances,
+        allowNegative: agency.negativeStockAllowed === true,
+      })
+    }
+
     tx.set(txRef, {
       ...saleFields,
       idempotencyKey: input.idempotencyKey,
       obligationId: outstanding > 0 ? obligationRef.id : null,
+      inventoryApplied: inventoryLines.length > 0,
       createdBy: actorUid,
       createdAt: FieldValue.serverTimestamp(),
       updatedAt: FieldValue.serverTimestamp(),
@@ -485,6 +529,7 @@ export const reverseGodownSale = functions.region('asia-south1').https.onCall(as
     throw new functions.https.HttpsError('invalid-argument', 'Confirm deletion with a reason.')
   }
   const input = parsed.data
+  const { agency } = await loadAgencyLookups()
   const db = getFirestore()
   const txRef = db.collection('transactions').doc(input.transactionId)
 
@@ -530,10 +575,40 @@ export const reverseGodownSale = functions.region('asia-south1').https.onCall(as
       }
     }
 
+    if (current.inventoryApplied === true && typeof current.locationId === 'string' && current.locationId) {
+      const quantities = current.quantities ?? {}
+      const lines = godownSaleLedgerLines({
+        locationId: current.locationId,
+        productId: String(current.productId ?? ''),
+        filledIssued: Number(quantities.filledIssued ?? 0),
+        emptyReceived: Number(quantities.emptyReceived ?? 0),
+      })
+      const reverseLines = reverseLedgerLines(lines)
+      if (reverseLines.length > 0) {
+        const balances = await loadBalanceMap(
+          tx,
+          reverseLines.map((line) => ({
+            locationId: line.locationId,
+            productId: line.productId,
+            state: line.state,
+          })),
+        )
+        applyLedgerAndBalancesInTx(tx, {
+          transactionId: `${txRef.id}_rev`,
+          businessDate: String(current.businessDate ?? ''),
+          actorUid,
+          lines: reverseLines,
+          currentBalances: balances,
+          allowNegative: agency.negativeStockAllowed === true,
+        })
+      }
+    }
+
     tx.update(txRef, {
       status: 'reversed',
       reverseReason: input.reason,
       reversedByTransactionId: null,
+      inventoryApplied: false,
       updatedBy: actorUid,
       updatedAt: FieldValue.serverTimestamp(),
     })
@@ -558,6 +633,7 @@ export const recordEmptyReturn = functions.region('asia-south1').https.onCall(as
     throw new functions.https.HttpsError('invalid-argument', 'Check the empty return form and try again.')
   }
   const input = parsed.data
+  const { agency } = await loadAgencyLookups()
   const db = getFirestore()
   const txRef = db.collection('transactions').doc(input.transactionId)
   const idemRef = db.collection('idempotencyRecords').doc(input.idempotencyKey)
@@ -621,6 +697,44 @@ export const recordEmptyReturn = functions.region('asia-south1').https.onCall(as
         ? origin.businessDate
         : null
 
+    const receiveLocationId =
+      (typeof input.locationId === 'string' && input.locationId.trim()
+        ? input.locationId.trim()
+        : null) ?? (typeof origin.locationId === 'string' ? origin.locationId : null)
+
+    const inventoryEligible = await assertInventoryEligibleForGodown(tx, {
+      businessDate: input.businessDate,
+      locationId: receiveLocationId,
+      productId: String(origin.productId ?? ''),
+    })
+    const inventoryLines =
+      inventoryEligible && receiveLocationId
+        ? emptyReturnLedgerLines({
+            locationId: receiveLocationId,
+            productId: String(origin.productId ?? ''),
+            emptyReturned: input.emptyReturned,
+          })
+        : []
+
+    if (inventoryLines.length > 0) {
+      const balances = await loadBalanceMap(
+        tx,
+        inventoryLines.map((line) => ({
+          locationId: line.locationId,
+          productId: line.productId,
+          state: line.state,
+        })),
+      )
+      applyLedgerAndBalancesInTx(tx, {
+        transactionId: txRef.id,
+        businessDate: input.businessDate,
+        actorUid,
+        lines: inventoryLines,
+        currentBalances: balances,
+        allowNegative: agency.negativeStockAllowed === true,
+      })
+    }
+
     tx.set(txRef, {
       type: 'empty_return',
       status: 'posted',
@@ -630,7 +744,7 @@ export const recordEmptyReturn = functions.region('asia-south1').https.onCall(as
       customerKind: origin.customerKind,
       customerId: origin.customerId ?? null,
       customerSnapshot: origin.customerSnapshot,
-      locationId: origin.locationId ?? null,
+      locationId: receiveLocationId,
       productId: origin.productId,
       productName: origin.productName,
       quantities: {
@@ -654,6 +768,7 @@ export const recordEmptyReturn = functions.region('asia-south1').https.onCall(as
       originBusinessDate,
       remainingOutstandingAfter: nextOutstanding,
       obligationId,
+      inventoryApplied: inventoryLines.length > 0,
       reversalOf: null,
       reversedByTransactionId: null,
       reverseReason: null,

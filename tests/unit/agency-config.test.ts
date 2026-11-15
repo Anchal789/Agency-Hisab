@@ -11,8 +11,31 @@ describe('agency configuration models', () => {
     })
     expect(parsed.timezone).toBe('Asia/Kolkata')
     expect(parsed.currency).toBe('INR')
+    expect(parsed.inventoryCutoverDate).toBeNull()
     expect(parsed.paymentMethods).toEqual([{ id: 'pm1', name: 'Cash', kind: 'cash', active: true }])
     expect(parsed.receivingAccounts[0]?.kind).toBe('cash')
+  })
+
+  it('parses inventory cutover date and expanded location kinds', () => {
+    const parsed = parseAgencySettings({
+      name: 'Miragpur Indane Gas Agency',
+      inventoryCutoverDate: '2026-11-11',
+    })
+    expect(parsed.inventoryCutoverDate).toBe('2026-11-11')
+    expect(parseLocation('v1', { name: 'Vehicle 1', kind: 'vehicle', active: true })?.kind).toBe('vehicle')
+    expect(parseLocation('a1', { name: 'Agent A', kind: 'agent', active: true })?.kind).toBe('agent')
+    expect(parseLocation('c1', { name: 'CSC 1', kind: 'csc', active: true })?.kind).toBe('csc')
+    expect(
+      manageAgencyConfigSchema.safeParse({
+        action: 'updateProfile',
+        payload: {
+          name: 'Miragpur Indane Gas Agency',
+          timezone: 'Asia/Kolkata',
+          currency: 'INR',
+          inventoryCutoverDate: '2026-11-11',
+        },
+      }).success,
+    ).toBe(true)
   })
 
   it('normalizes legacy portal destination kind and Online payment method', () => {
