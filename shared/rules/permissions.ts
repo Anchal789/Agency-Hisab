@@ -14,6 +14,8 @@ export const STAFF_PERMISSION_KEYS = [
   'vehicles.record',
   'expenses.create',
   'reports.viewAssigned',
+  /** Phase 5.0 Admin opening workflows also use Admin role; key reserved for staff grants later if needed. */
+  'finance.manageOpening',
 ] as const
 
 export type StaffPermission = (typeof STAFF_PERMISSION_KEYS)[number]
@@ -39,6 +41,7 @@ export function emptyPermissions(): PermissionMap {
     'vehicles.record': false,
     'expenses.create': false,
     'reports.viewAssigned': false,
+    'finance.manageOpening': false,
   }
 }
 
@@ -183,6 +186,7 @@ export const IMPLEMENTED_NAV_MODULES: ReadonlySet<NavModuleKey> = new Set([
   'inventory',
   'users',
   'settings',
+  'hisab',
 ])
 
 /** Map staff permissions to nav module keys for visibility. */
@@ -218,6 +222,8 @@ export function canViewNavModule(role: AppRole, permissions: PermissionMap, navK
   if (navKey === 'users') return canAccessUsers(role)
   if (navKey === 'settings') return canAccessSettings(role)
   if (navKey === 'approvals') return role === 'admin'
+  // Phase 5.0 Hisab opening workflow is Admin-only. Staff Hisab reports arrive in later sub-phases.
+  if (navKey === 'hisab') return role === 'admin'
 
   if (role === 'admin') return true
 

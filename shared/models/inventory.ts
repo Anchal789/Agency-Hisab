@@ -107,6 +107,14 @@ export function isInventoryCutoverEligible(
   return businessDate >= inventoryCutoverDate
 }
 
+/**
+ * Non-godown locations start at zero stock and receive cylinders via transfer.
+ * They do not require an inventoryOpenings row before inbound transfer.
+ */
+export function locationStartsWithZeroStock(kind: string): boolean {
+  return kind !== 'godown'
+}
+
 export type BalanceDelta = {
   locationId: string
   productId: string

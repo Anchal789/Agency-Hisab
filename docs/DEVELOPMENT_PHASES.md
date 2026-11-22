@@ -1,6 +1,6 @@
 # Development Phases
 
-Status: Phase 4 Inventory Management implemented locally. Awaiting manual testing and approval before Phase 5. Do not push or deploy without approval.
+Status: Phase 5.0 Financial Foundation and Opening implemented locally (not deployed). Stop for approval before Phase 5F. Do not push or deploy without approval.
 
 Work proceeds in order. A phase starts only after the product owner sends:
 

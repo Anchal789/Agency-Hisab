@@ -17,7 +17,17 @@ import {
   type PriceRuleDoc,
   type ProductDoc,
   type ReceivingAccount,
+  type ReceivingAccountOwnership,
 } from '@shared/models/agency-config'
+import {
+  isDuplicateAmong,
+  locationUniquenessKey,
+  paymentMethodUniquenessKey,
+  priceRuleUniquenessKey,
+  productCodeUniquenessKey,
+  productNameUniquenessKey,
+  receivingAccountUniquenessKey,
+} from '@shared/rules/settings-uniqueness'
 import { useAuth } from '@/app/providers/AuthProvider'
 import { ConfirmationDialog } from '@/components/common/ConfirmationDialog'
 import { EmptyState } from '@/components/common/EmptyState'
@@ -36,8 +46,15 @@ import { manageAgencyConfig } from '@/services/api/agency-settings'
 import { callableErrorMessage } from '@/services/errors'
 import { getFirebase } from '@/services/firebase/client'
 
-type DraftNamed = { id?: string; name: string; kind: PaymentCategory }
-type DraftAccount = { id?: string; name: string; kind: PaymentCategory }
+type DraftNamed = { id?: string; name: string; kind: PaymentCategory; active?: boolean }
+type DraftAccount = {
+  id?: string
+  name: string
+  kind: PaymentCategory
+  active?: boolean
+  ownership?: ReceivingAccountOwnership | ''
+  compatiblePaymentMethodIds: string[]
+}
 type DraftLocation = {
   id?: string
   name: string
@@ -54,8 +71,14 @@ export function SettingsPage() {
   const [timezone, setTimezone] = useState('Asia/Kolkata')
   const [currency, setCurrency] = useState('INR')
   const [inventoryCutoverDate, setInventoryCutoverDate] = useState('')
-  const [methodDraft, setMethodDraft] = useState<DraftNamed>({ name: '', kind: 'cash' })
-  const [accountDraft, setAccountDraft] = useState<DraftAccount>({ name: '', kind: 'cash' })
+  const [methodDraft, setMethodDraft] = useState<DraftNamed>({ name: '', kind: 'cash', active: true })
+  const [accountDraft, setAccountDraft] = useState<DraftAccount>({
+    name: '',
+    kind: 'cash',
+    active: true,
+    ownership: '',
+    compatiblePaymentMethodIds: [],
+  })
   const [locationDraft, setLocationDraft] = useState<DraftLocation>({ name: '', kind: 'godown' })
   const [productDraft, setProductDraft] = useState<DraftProduct>({
     name: '',
@@ -64,11 +87,11 @@ export function SettingsPage() {
     unit: 'cylinder',
   })
   const [priceDraft, setPriceDraft] = useState<DraftPrice>({ productId: '', label: '', amountRupees: '' })
-  const [deleteTarget, setDeleteTarget] = useState<
-    | { type: 'method' | 'account'; id: string; name: string }
-    | { type: 'location' | 'product' | 'price'; id: string; name: string }
-    | null
-  >(null)
+  const [deleteTarget, setDeleteTarget] = useState<{
+    type: 'location' | 'product' | 'price'
+    id: string
+    name: string
+  } | null>(null)
 
   const agencyQuery = useQuery({
     queryKey: ['settings', 'agency'],
@@ -125,8 +148,14 @@ export function SettingsPage() {
         queryClient.invalidateQueries({ queryKey: ['settings', 'priceRules'] }),
         queryClient.invalidateQueries({ queryKey: ['godown-config'] }),
       ])
-      setMethodDraft({ name: '', kind: 'cash' })
-      setAccountDraft({ name: '', kind: 'cash' })
+      setMethodDraft({ name: '', kind: 'cash', active: true })
+      setAccountDraft({
+        name: '',
+        kind: 'cash',
+        active: true,
+        ownership: '',
+        compatiblePaymentMethodIds: [],
+      })
       setLocationDraft({ name: '', kind: 'godown' })
       setProductDraft({ name: '', code: '', kind: 'cylinder', unit: 'cylinder' })
       setPriceDraft({ productId: '', label: '', amountRupees: '' })
@@ -173,26 +202,87 @@ export function SettingsPage() {
       return
     }
     const id = draft.id ?? newConfigId(kind === 'payment' ? 'pm' : 'ra')
-    const duplicate = existing.some((item) => item.id !== id && item.name.trim().toLowerCase() === name.toLowerCase())
-    if (duplicate) {
-      toast.error(t('settings.duplicateName'))
-      return
-    }
     if (kind === 'payment') {
       const methodDraftValue = draft as DraftNamed
+      if (
+        isDuplicateAmong(
+          existing as PaymentMethod[],
+          { id },
+          paymentMethodUniquenessKey({ name, kind: methodDraftValue.kind }),
+          paymentMethodUniquenessKey,
+        )
+      ) {
+        toast.error(t('settings.duplicateNameCategory'))
+        return
+      }
       const next = [
         ...(existing as PaymentMethod[]).filter((item) => item.id !== id),
-        { id, name, kind: methodDraftValue.kind, active: true },
+        {
+          id,
+          name,
+          kind: methodDraftValue.kind,
+          active: methodDraftValue.active !== false,
+        },
       ]
       saveNamedList('payment', next)
+      setMethodDraft({ name: '', kind: 'cash', active: true })
       return
     }
     const accountDraftValue = draft as DraftAccount
+    if (!accountDraftValue.ownership) {
+      toast.error(t('settings.ownershipRequired'))
+      return
+    }
+    if (accountDraftValue.compatiblePaymentMethodIds.length === 0) {
+      toast.error(t('settings.compatibleMethodsRequired'))
+      return
+    }
+    if (
+      isDuplicateAmong(
+        existing as ReceivingAccount[],
+        { id },
+        receivingAccountUniquenessKey({ name, kind: accountDraftValue.kind }),
+        receivingAccountUniquenessKey,
+      )
+    ) {
+      toast.error(t('settings.duplicateNameCategory'))
+      return
+    }
     const next = [
       ...(existing as ReceivingAccount[]).filter((item) => item.id !== id),
-      { id, name, kind: accountDraftValue.kind, active: true },
+      {
+        id,
+        name,
+        kind: accountDraftValue.kind,
+        active: accountDraftValue.active !== false,
+        ownership: accountDraftValue.ownership,
+        compatiblePaymentMethodIds: accountDraftValue.compatiblePaymentMethodIds,
+      },
     ]
     saveNamedList('receiving', next)
+    setAccountDraft({
+      name: '',
+      kind: 'cash',
+      active: true,
+      ownership: '',
+      compatiblePaymentMethodIds: [],
+    })
+  }
+
+  function setDestinationActive(accountId: string, active: boolean) {
+    if (!agency) return
+    const next = agency.receivingAccounts.map((item) =>
+      item.id === accountId ? { ...item, active } : item,
+    )
+    saveNamedList('receiving', next)
+  }
+
+  function setMethodActive(methodId: string, active: boolean) {
+    if (!agency) return
+    const next = agency.paymentMethods.map((item) =>
+      item.id === methodId ? { ...item, active } : item,
+    )
+    saveNamedList('payment', next)
   }
 
   const agency = agencyQuery.data
@@ -308,7 +398,10 @@ export function SettingsPage() {
                   {methodDraft.id ? t('common.save') : t('common.add')}
                 </Button>
                 {methodDraft.id ? (
-                  <Button variant="outline" onClick={() => setMethodDraft({ name: '', kind: 'cash' })}>
+                  <Button
+                    variant="outline"
+                    onClick={() => setMethodDraft({ name: '', kind: 'cash', active: true })}
+                  >
                     {t('common.cancel')}
                   </Button>
                 ) : null}
@@ -322,8 +415,17 @@ export function SettingsPage() {
                   <ConfigRow
                     key={item.id}
                     title={`${item.name} · ${t(`settings.accountKinds.${item.kind}`)}`}
-                    onEdit={() => setMethodDraft({ id: item.id, name: item.name, kind: item.kind })}
-                    onDelete={() => setDeleteTarget({ type: 'method', id: item.id, name: item.name })}
+                    badge={item.active ? undefined : t('settings.inactive')}
+                    onEdit={() =>
+                      setMethodDraft({
+                        id: item.id,
+                        name: item.name,
+                        kind: item.kind,
+                        active: item.active,
+                      })
+                    }
+                    onDelete={() => setMethodActive(item.id, !item.active)}
+                    deleteLabel={item.active ? t('settings.deactivate') : t('settings.activate')}
                   />
                 ))}
               </ul>
@@ -331,25 +433,74 @@ export function SettingsPage() {
           </FormSection>
 
           <FormSection title={t('settings.receivingAccountsTitle')} description={t('settings.receivingAccountsBody')}>
-            <div className="mb-3 grid gap-3 sm:grid-cols-[1fr_10rem_auto]">
-              <Input
-                value={accountDraft.name}
-                onChange={(event) => setAccountDraft((current) => ({ ...current, name: event.target.value }))}
-                placeholder={t('settings.itemName')}
-              />
-              <select
-                className="h-11 rounded-md border border-input bg-card px-3 text-sm"
-                value={accountDraft.kind}
-                onChange={(event) =>
-                  setAccountDraft((current) => ({ ...current, kind: event.target.value as PaymentCategory }))
-                }
-              >
-                {PAYMENT_CATEGORIES.map((category) => (
-                  <option key={category} value={category}>
-                    {t(`settings.accountKinds.${category}`)}
-                  </option>
-                ))}
-              </select>
+            <div className="mb-3 space-y-3">
+              <div className="grid gap-3 sm:grid-cols-2">
+                <Input
+                  value={accountDraft.name}
+                  onChange={(event) => setAccountDraft((current) => ({ ...current, name: event.target.value }))}
+                  placeholder={t('settings.destinationName')}
+                />
+                <select
+                  className="h-11 rounded-md border border-input bg-card px-3 text-sm"
+                  value={accountDraft.kind}
+                  onChange={(event) =>
+                    setAccountDraft((current) => ({ ...current, kind: event.target.value as PaymentCategory }))
+                  }
+                >
+                  {PAYMENT_CATEGORIES.map((category) => (
+                    <option key={category} value={category}>
+                      {t(`settings.accountKinds.${category}`)}
+                    </option>
+                  ))}
+                </select>
+                <select
+                  className="h-11 rounded-md border border-input bg-card px-3 text-sm"
+                  value={accountDraft.ownership}
+                  onChange={(event) =>
+                    setAccountDraft((current) => ({
+                      ...current,
+                      ownership: event.target.value as ReceivingAccountOwnership | '',
+                    }))
+                  }
+                >
+                  <option value="">{t('settings.ownershipPlaceholder')}</option>
+                  <option value="agency">{t('settings.ownership.agency')}</option>
+                  <option value="third_party_held">{t('settings.ownership.third_party_held')}</option>
+                  <option value="portal">{t('settings.ownership.portal')}</option>
+                </select>
+              </div>
+              <div>
+                <p className="mb-2 text-sm font-medium">{t('settings.compatibleMethods')}</p>
+                <p className="mb-2 text-xs text-muted-foreground">{t('settings.compatibleMethodsHint')}</p>
+                {agency.paymentMethods.filter((method) => method.active).length === 0 ? (
+                  <p className="text-sm text-amber-800">{t('settings.addMethodsFirst')}</p>
+                ) : (
+                  <div className="flex flex-wrap gap-3">
+                    {agency.paymentMethods
+                      .filter((method) => method.active)
+                      .map((method) => {
+                        const checked = accountDraft.compatiblePaymentMethodIds.includes(method.id)
+                        return (
+                          <label key={method.id} className="flex items-center gap-2 text-sm">
+                            <input
+                              type="checkbox"
+                              checked={checked}
+                              onChange={() =>
+                                setAccountDraft((current) => ({
+                                  ...current,
+                                  compatiblePaymentMethodIds: checked
+                                    ? current.compatiblePaymentMethodIds.filter((id) => id !== method.id)
+                                    : [...current.compatiblePaymentMethodIds, method.id],
+                                }))
+                              }
+                            />
+                            {method.name}
+                          </label>
+                        )
+                      })}
+                  </div>
+                )}
+              </div>
               <div className="flex gap-2">
                 <Button
                   disabled={configMutation.isPending || accountDraft.name.trim().length < 1}
@@ -358,7 +509,18 @@ export function SettingsPage() {
                   {accountDraft.id ? t('common.save') : t('common.add')}
                 </Button>
                 {accountDraft.id ? (
-                  <Button variant="outline" onClick={() => setAccountDraft({ name: '', kind: 'cash' })}>
+                  <Button
+                    variant="outline"
+                    onClick={() =>
+                      setAccountDraft({
+                        name: '',
+                        kind: 'cash',
+                        active: true,
+                        ownership: '',
+                        compatiblePaymentMethodIds: [],
+                      })
+                    }
+                  >
                     {t('common.cancel')}
                   </Button>
                 ) : null}
@@ -371,9 +533,26 @@ export function SettingsPage() {
                 {agency.receivingAccounts.map((item) => (
                   <ConfigRow
                     key={item.id}
-                    title={`${item.name} · ${t(`settings.accountKinds.${item.kind}`)}`}
-                    onEdit={() => setAccountDraft({ id: item.id, name: item.name, kind: item.kind })}
-                    onDelete={() => setDeleteTarget({ type: 'account', id: item.id, name: item.name })}
+                    title={`${item.name} · ${t(`settings.ownership.${item.ownership ?? 'unset'}`)}`}
+                    badge={
+                      item.active
+                        ? (item.compatiblePaymentMethodIds ?? [])
+                            .map((id) => agency.paymentMethods.find((method) => method.id === id)?.name ?? id)
+                            .join(', ') || t(`settings.accountKinds.${item.kind}`)
+                        : t('settings.inactive')
+                    }
+                    onEdit={() =>
+                      setAccountDraft({
+                        id: item.id,
+                        name: item.name,
+                        kind: item.kind,
+                        active: item.active,
+                        ownership: item.ownership ?? '',
+                        compatiblePaymentMethodIds: item.compatiblePaymentMethodIds ?? [],
+                      })
+                    }
+                    onDelete={() => setDestinationActive(item.id, !item.active)}
+                    deleteLabel={item.active ? t('settings.deactivate') : t('settings.activate')}
                   />
                 ))}
               </ul>
@@ -405,17 +584,30 @@ export function SettingsPage() {
               </select>
               <Button
                 disabled={configMutation.isPending || locationDraft.name.trim().length < 2}
-                onClick={() =>
+                onClick={() => {
+                  const name = locationDraft.name.trim()
+                  const locations = locationsQuery.data ?? []
+                  if (
+                    isDuplicateAmong(
+                      locations,
+                      { id: locationDraft.id },
+                      locationUniquenessKey({ name, kind: locationDraft.kind }),
+                      locationUniquenessKey,
+                    )
+                  ) {
+                    toast.error(t('settings.duplicateNameCategory'))
+                    return
+                  }
                   configMutation.mutate({
                     action: 'upsertLocation',
                     payload: {
                       ...(locationDraft.id ? { id: locationDraft.id } : {}),
-                      name: locationDraft.name.trim(),
+                      name,
                       kind: locationDraft.kind,
                       active: true,
                     },
                   })
-                }
+                }}
               >
                 {locationDraft.id ? t('common.save') : t('common.add')}
               </Button>
@@ -444,11 +636,14 @@ export function SettingsPage() {
                 onChange={(event) => setProductDraft((current) => ({ ...current, name: event.target.value }))}
                 placeholder={t('settings.itemName')}
               />
-              <Input
-                value={productDraft.code}
-                onChange={(event) => setProductDraft((current) => ({ ...current, code: event.target.value }))}
-                placeholder={t('settings.productCode')}
-              />
+              <div>
+                <Input
+                  value={productDraft.code}
+                  onChange={(event) => setProductDraft((current) => ({ ...current, code: event.target.value }))}
+                  placeholder={t('settings.productCode')}
+                />
+                <p className="mt-1 text-xs text-muted-foreground">{t('settings.productCodeHint')}</p>
+              </div>
               <select
                 className="h-11 rounded-md border border-input bg-card px-3 text-sm"
                 value={productDraft.kind}
@@ -467,19 +662,44 @@ export function SettingsPage() {
                 disabled={
                   configMutation.isPending || productDraft.name.trim().length < 2 || productDraft.code.trim().length < 1
                 }
-                onClick={() =>
+                onClick={() => {
+                  const name = productDraft.name.trim()
+                  const code = productDraft.code.trim()
+                  const products = productsQuery.data ?? []
+                  if (
+                    isDuplicateAmong(
+                      products,
+                      { id: productDraft.id },
+                      productNameUniquenessKey({ name, kind: productDraft.kind }),
+                      productNameUniquenessKey,
+                    )
+                  ) {
+                    toast.error(t('settings.duplicateNameCategory'))
+                    return
+                  }
+                  if (
+                    isDuplicateAmong(
+                      products,
+                      { id: productDraft.id },
+                      productCodeUniquenessKey(code),
+                      (item) => productCodeUniquenessKey(item.code),
+                    )
+                  ) {
+                    toast.error(t('settings.duplicateProductCode'))
+                    return
+                  }
                   configMutation.mutate({
                     action: 'upsertProduct',
                     payload: {
                       ...(productDraft.id ? { id: productDraft.id } : {}),
-                      name: productDraft.name.trim(),
-                      code: productDraft.code.trim(),
+                      name,
+                      code,
                       kind: productDraft.kind,
                       unit: productDraft.unit.trim() || 'cylinder',
                       active: true,
                     },
                   })
-                }
+                }}
               >
                 {productDraft.id ? t('common.save') : t('common.add')}
               </Button>
@@ -523,11 +743,14 @@ export function SettingsPage() {
                   </option>
                 ))}
               </select>
-              <Input
-                value={priceDraft.label}
-                onChange={(event) => setPriceDraft((current) => ({ ...current, label: event.target.value }))}
-                placeholder={t('settings.priceLabel')}
-              />
+              <div>
+                <Input
+                  value={priceDraft.label}
+                  onChange={(event) => setPriceDraft((current) => ({ ...current, label: event.target.value }))}
+                  placeholder={t('settings.priceLabel')}
+                />
+                <p className="mt-1 text-xs text-muted-foreground">{t('settings.priceLabelHint')}</p>
+              </div>
               <Input
                 value={priceDraft.amountRupees}
                 onChange={(event) => setPriceDraft((current) => ({ ...current, amountRupees: event.target.value }))}
@@ -539,8 +762,21 @@ export function SettingsPage() {
                 onClick={() => {
                   try {
                     const amountPaise = rupeesToPaise(priceDraft.amountRupees)
-                    if (!priceDraft.productId || priceDraft.label.trim().length < 2) {
+                    const label = priceDraft.label.trim()
+                    if (!priceDraft.productId || label.length < 2) {
                       toast.error(t('errors.invalidInput'))
+                      return
+                    }
+                    const prices = pricesQuery.data ?? []
+                    if (
+                      isDuplicateAmong(
+                        prices,
+                        { id: priceDraft.id },
+                        priceRuleUniquenessKey({ label, productId: priceDraft.productId }),
+                        priceRuleUniquenessKey,
+                      )
+                    ) {
+                      toast.error(t('settings.duplicatePriceLabel'))
                       return
                     }
                     configMutation.mutate({
@@ -548,7 +784,7 @@ export function SettingsPage() {
                       payload: {
                         ...(priceDraft.id ? { id: priceDraft.id } : {}),
                         productId: priceDraft.productId,
-                        label: priceDraft.label.trim(),
+                        label,
                         amountPaise,
                         active: true,
                       },
@@ -598,20 +834,6 @@ export function SettingsPage() {
         }}
         onConfirm={() => {
           if (!deleteTarget || !agency) return
-          if (deleteTarget.type === 'method') {
-            saveNamedList(
-              'payment',
-              agency.paymentMethods.filter((item) => item.id !== deleteTarget.id),
-            )
-            return
-          }
-          if (deleteTarget.type === 'account') {
-            saveNamedList(
-              'receiving',
-              agency.receivingAccounts.filter((item) => item.id !== deleteTarget.id),
-            )
-            return
-          }
           if (deleteTarget.type === 'location') {
             configMutation.mutate({ action: 'deleteLocation', payload: { id: deleteTarget.id } })
             return
@@ -632,11 +854,13 @@ function ConfigRow({
   badge,
   onEdit,
   onDelete,
+  deleteLabel,
 }: {
   title: string
   badge?: string
   onEdit: () => void
   onDelete: () => void
+  deleteLabel?: string
 }) {
   const { t } = useTranslation()
   return (
@@ -653,7 +877,7 @@ function ConfigRow({
         {t('common.edit')}
       </Button>
       <Button variant="outline" size="sm" onClick={onDelete}>
-        {t('common.delete')}
+        {deleteLabel ?? t('common.delete')}
       </Button>
     </li>
   )

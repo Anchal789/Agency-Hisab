@@ -6,6 +6,7 @@ export {
   amountsFromReceivedAndDue,
   derivedSaleAmounts,
   derivedSaleQuantities,
+  isDacReceivedDateAllowed,
   type CreateGodownSaleInput,
   type UpdateGodownSaleInput,
   type ReverseGodownSaleInput,

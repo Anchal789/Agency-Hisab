@@ -20,7 +20,14 @@ import { PageHeader } from '@/components/common/PageHeader'
 import { SummaryCard } from '@/components/common/SummaryCard'
 import { Button } from '@/components/ui/button'
 import { getFirebase } from '@/services/firebase/client'
-import { AlertBanner, AlertList, MovementDetailsDialog, SignedQty, StockFigure } from './InventoryWidgets'
+import {
+  AlertBanner,
+  AlertList,
+  CylinderTypeQtyRow,
+  MovementDetailsDialog,
+  SignedQty,
+  StockFigure,
+} from './InventoryWidgets'
 import {
   fetchInventoryBalances,
   fetchInventoryLedger,
@@ -31,6 +38,7 @@ import {
 } from './inventory-query'
 import {
   buildLocationStock,
+  buildProductStockTotals,
   countLocationsHolding,
   groupLedgerLines,
   sumRecorded,
@@ -77,6 +85,7 @@ export function InventoryDashboardPage() {
     () => buildLocationStock(locations, products, balancesQuery.data ?? [], openingsQuery.data ?? []),
     [locations, products, balancesQuery.data, openingsQuery.data],
   )
+  const stockByType = useMemo(() => buildProductStockTotals(stock, products), [stock, products])
   const movements = useMemo(() => groupLedgerLines(ledgerQuery.data ?? []).slice(0, 8), [ledgerQuery.data])
   const names = useMemo(() => new Map(locations.map((row) => [row.id, row.name])), [locations])
   const productNames = useMemo(() => new Map(products.map((row) => [row.id, row.name])), [products])
@@ -85,11 +94,17 @@ export function InventoryDashboardPage() {
   const empty = sumRecorded(stock, 'empty')
   const damaged = sumRecorded(stock, 'damaged')
   const pendingCount = pendingQuery.data?.length ?? 0
-  const missing = stock.flatMap((row) => row.products.filter((product) => !product.opened).map((product) => ({
-    location: row.location.name,
-    product: product.product.name,
-  })))
-  const noFilled = stock.filter((row) => row.filled === 0)
+  const missing = stock.flatMap((row) =>
+    row.location.kind !== 'godown'
+      ? []
+      : row.products
+          .filter((product) => !product.opened)
+          .map((product) => ({
+            location: row.location.name,
+            product: product.product.name,
+          })),
+  )
+  const noFilled = stock.filter((row) => row.location.kind === 'godown' && row.filled === 0 && row.products.some((product) => product.opened))
   const adjustmentsToday = (ledgerQuery.data ?? []).some((row) => row.movementType === 'adjustment')
   const customerDue = obligationsQuery.data?.customerOutstanding ?? 0
   const hasOpenings = (openingsQuery.data?.length ?? 0) > 0
@@ -151,25 +166,64 @@ export function InventoryDashboardPage() {
         <div className="space-y-6">
           <section className="grid gap-3 sm:grid-cols-2 xl:grid-cols-4" data-testid="inventory-summary">
             <SummaryCard
-              title={t('inventory.filledCylinders')}
+              title={t('inventory.filledCylindersTotal')}
               value={filled === null ? t('inventory.notRecordedShort') : String(filled)}
-              hint={filled === null ? t('inventory.notRecordedBody') : t('inventory.locationsHolding', { count: countLocationsHolding(stock, 'filled') })}
+              hint={
+                filled === null
+                  ? t('inventory.notRecordedBody')
+                  : t('inventory.totalsAcrossTypesHint', {
+                      count: countLocationsHolding(stock, 'filled'),
+                    })
+              }
             />
             <SummaryCard
-              title={t('inventory.emptyCylinders')}
+              title={t('inventory.emptyCylindersTotal')}
               value={empty === null ? t('inventory.notRecordedShort') : String(empty)}
-              hint={empty === null ? t('inventory.physicalEmptyNote') : t('inventory.locationsHolding', { count: countLocationsHolding(stock, 'empty') })}
+              hint={
+                empty === null
+                  ? t('inventory.physicalEmptyNote')
+                  : t('inventory.totalsAcrossTypesHint', {
+                      count: countLocationsHolding(stock, 'empty'),
+                    })
+              }
             />
             <SummaryCard
-              title={t('inventory.damagedCylinders')}
+              title={t('inventory.damagedCylindersTotal')}
               value={damaged === null ? t('inventory.notRecordedShort') : String(damaged)}
-              hint={damaged === null ? undefined : t('inventory.locationsHolding', { count: countLocationsHolding(stock, 'damaged') })}
+              hint={
+                damaged === null
+                  ? undefined
+                  : t('inventory.totalsAcrossTypesHint', {
+                      count: countLocationsHolding(stock, 'damaged'),
+                    })
+              }
             />
             <SummaryCard
               title={t('inventory.pendingEntries')}
               value={String(pendingCount)}
               hint={pendingCount > 0 ? t('inventory.pendingHint') : t('inventory.pendingClear')}
             />
+          </section>
+
+          <section data-testid="inventory-by-cylinder-type">
+            <h2 className="mb-3 text-lg font-semibold">{t('inventory.stockByCylinderType')}</h2>
+            {products.length === 0 ? (
+              <EmptyState title={t('inventory.noCylinderTypesTitle')} description={t('inventory.noCylinderTypesBody')} />
+            ) : (
+              <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-3">
+                {stockByType.map((row) => (
+                  <CylinderTypeQtyRow
+                    key={row.product.id}
+                    name={row.product.name}
+                    code={row.product.code}
+                    filled={row.filled}
+                    empty={row.empty}
+                    damaged={row.damaged}
+                    missingLabel={t('inventory.notRecordedShort')}
+                  />
+                ))}
+              </div>
+            )}
           </section>
 
           <AlertList>
@@ -226,10 +280,10 @@ export function InventoryDashboardPage() {
               <EmptyState title={t('inventory.notRecordedTitle')} description={t('inventory.notRecordedBody')} />
             ) : (
               <>
-                <div className="space-y-3 md:hidden">
+                <div className="space-y-3">
                   {stock.map((row) => (
                     <article key={row.location.id} className="rounded-xl border border-border bg-card p-4">
-                      <div className="flex items-start justify-between gap-3">
+                      <div className="flex flex-wrap items-start justify-between gap-3">
                         <div>
                           <h3 className="font-semibold">{row.location.name}</h3>
                           <p className="text-xs text-muted-foreground">{t(`inventory.kind.${row.location.kind}`)}</p>
@@ -238,44 +292,41 @@ export function InventoryDashboardPage() {
                           <Link to={`/inventory/locations?location=${row.location.id}`}>{t('inventory.view')}</Link>
                         </Button>
                       </div>
-                      <dl className="mt-3 grid grid-cols-3 gap-2 text-sm">
-                        <div><dt className="text-muted-foreground">{t('inventory.filled')}</dt><dd><StockFigure value={row.filled} missingLabel={t('inventory.notRecordedShort')} /></dd></div>
-                        <div><dt className="text-muted-foreground">{t('inventory.empty')}</dt><dd><StockFigure value={row.empty} missingLabel={t('inventory.notRecordedShort')} /></dd></div>
-                        <div><dt className="text-muted-foreground">{t('inventory.damaged')}</dt><dd><StockFigure value={row.damaged} missingLabel={t('inventory.notRecordedShort')} /></dd></div>
+                      <div className="mt-3 space-y-2">
+                        {row.products.map((product) => (
+                          <CylinderTypeQtyRow
+                            key={product.product.id}
+                            name={product.product.name}
+                            code={product.product.code}
+                            filled={product.filled}
+                            empty={product.empty}
+                            damaged={product.damaged}
+                            missingLabel={t('inventory.notRecordedShort')}
+                          />
+                        ))}
+                      </div>
+                      <dl className="mt-3 grid grid-cols-3 gap-2 border-t border-border pt-3 text-sm">
+                        <div>
+                          <dt className="text-xs text-muted-foreground">{t('inventory.locationTotalFilled')}</dt>
+                          <dd>
+                            <StockFigure value={row.filled} missingLabel={t('inventory.notRecordedShort')} />
+                          </dd>
+                        </div>
+                        <div>
+                          <dt className="text-xs text-muted-foreground">{t('inventory.locationTotalEmpty')}</dt>
+                          <dd>
+                            <StockFigure value={row.empty} missingLabel={t('inventory.notRecordedShort')} />
+                          </dd>
+                        </div>
+                        <div>
+                          <dt className="text-xs text-muted-foreground">{t('inventory.locationTotalDamaged')}</dt>
+                          <dd>
+                            <StockFigure value={row.damaged} missingLabel={t('inventory.notRecordedShort')} />
+                          </dd>
+                        </div>
                       </dl>
                     </article>
                   ))}
-                </div>
-                <div className="hidden overflow-x-auto rounded-xl border border-border bg-card md:block">
-                  <table className="min-w-full text-sm">
-                    <thead className="bg-muted/50 text-left">
-                      <tr>
-                        <th className="px-4 py-3 font-medium">{t('inventory.location')}</th>
-                        <th className="px-4 py-3 font-medium">{t('inventory.filled')}</th>
-                        <th className="px-4 py-3 font-medium">{t('inventory.empty')}</th>
-                        <th className="px-4 py-3 font-medium">{t('inventory.damaged')}</th>
-                        <th className="px-4 py-3 font-medium">{t('inventory.action')}</th>
-                      </tr>
-                    </thead>
-                    <tbody>
-                      {stock.map((row) => (
-                        <tr key={row.location.id} className="border-t border-border">
-                          <td className="px-4 py-3">
-                            <p className="font-medium">{row.location.name}</p>
-                            <p className="text-xs text-muted-foreground">{t(`inventory.kind.${row.location.kind}`)}</p>
-                          </td>
-                          <td className="px-4 py-3"><StockFigure value={row.filled} missingLabel={t('inventory.notRecordedShort')} /></td>
-                          <td className="px-4 py-3"><StockFigure value={row.empty} missingLabel={t('inventory.notRecordedShort')} /></td>
-                          <td className="px-4 py-3"><StockFigure value={row.damaged} missingLabel={t('inventory.notRecordedShort')} /></td>
-                          <td className="px-4 py-3">
-                            <Button asChild size="sm" variant="outline">
-                              <Link to={`/inventory/locations?location=${row.location.id}`}>{t('inventory.view')}</Link>
-                            </Button>
-                          </td>
-                        </tr>
-                      ))}
-                    </tbody>
-                  </table>
                 </div>
               </>
             )}

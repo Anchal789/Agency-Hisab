@@ -52,8 +52,32 @@ const saleFieldsBase = z.object({
   paymentMethodId: z.string().trim().min(1).max(80).nullable().optional(),
   receivingAccountId: z.string().trim().min(1).max(80).nullable().optional(),
   bookingStatus: z.enum(['yes', 'no']),
+  /**
+   * Optional date the manager received the customer's DAC (Delivery Authentication Code).
+   * Stores only the date — never the six-digit code. Null/omitted when not recorded.
+   */
+  dacReceivedDate: z
+    .union([
+      isoDateSchema,
+      z.null(),
+      z.literal('').transform(() => null),
+    ])
+    .optional(),
   note: optionalNullableTrimmed(500),
 })
+
+/** Reject DAC dates after the sale business date. Future-vs-today is enforced in Cloud Functions. */
+export function isDacReceivedDateAllowed(
+  dacReceivedDate: string | null | undefined,
+  businessDate: string,
+  todayBusinessDate?: string,
+): boolean {
+  if (dacReceivedDate == null || dacReceivedDate === '') return true
+  if (!/^\d{4}-\d{2}-\d{2}$/.test(dacReceivedDate)) return false
+  if (dacReceivedDate > businessDate) return false
+  if (todayBusinessDate && dacReceivedDate > todayBusinessDate) return false
+  return true
+}
 
 function refineSaleFields(value: z.infer<typeof saleFieldsBase>, ctx: z.RefinementCtx) {
   if (value.customerKind === 'registered') {
@@ -117,6 +141,14 @@ function refineSaleFields(value: z.infer<typeof saleFieldsBase>, ctx: z.Refineme
         path: ['receivingAccountId'],
       })
     }
+  }
+
+  if (value.dacReceivedDate && !isDacReceivedDateAllowed(value.dacReceivedDate, value.businessDate)) {
+    ctx.addIssue({
+      code: z.ZodIssueCode.custom,
+      message: 'DAC received date cannot be after the transaction date.',
+      path: ['dacReceivedDate'],
+    })
   }
 }
 

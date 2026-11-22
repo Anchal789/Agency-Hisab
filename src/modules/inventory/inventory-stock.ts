@@ -1,6 +1,7 @@
 import type { LocationDoc, ProductDoc } from '@shared/models/agency-config'
 import {
   inventoryBalanceId,
+  locationStartsWithZeroStock,
   type InventoryBalanceDoc,
   type InventoryLedgerLine,
   type InventoryMovementType,
@@ -10,7 +11,10 @@ import {
 
 export type ProductStock = {
   product: ProductDoc
+  /** True when quantities should be shown (opening exists, or zero-start non-godown). */
   opened: boolean
+  /** True when an inventoryOpenings row exists for this location+product. */
+  hasOpening: boolean
   filled: number | null
   empty: number | null
   damaged: number | null
@@ -60,21 +64,32 @@ export function buildLocationStock(
   const quantities = new Map(balances.map((row) => [row.id, row.quantity]))
 
   return locations.map((location) => {
+    const zeroStart = locationStartsWithZeroStock(location.kind)
     const productRows = products.map((product) => {
-      const opened = openSet.has(`${location.id}_${product.id}`)
+      const hasOpening = openSet.has(`${location.id}_${product.id}`)
+      // Godown: opening required before quantities are recorded.
+      // Vehicles/agents/CSC/other: start at zero without an opening row.
+      const opened = hasOpening || zeroStart
       const qty = (state: InventoryState): number | null =>
         opened ? (quantities.get(inventoryBalanceId(location.id, product.id, state)) ?? 0) : null
       return {
         product,
         opened,
+        hasOpening,
         filled: qty('filled'),
         empty: qty('empty'),
         damaged: qty('damaged'),
       }
     })
-    const openedRows = productRows.filter((row) => row.opened)
-    const sum = (key: 'filled' | 'empty' | 'damaged'): number | null =>
-      openedRows.length === 0 ? null : openedRows.reduce((total, row) => total + (row[key] ?? 0), 0)
+    const recordedRows = productRows.filter((row) => row.opened)
+    const sum = (key: 'filled' | 'empty' | 'damaged'): number | null => {
+      if (zeroStart) {
+        return recordedRows.reduce((total, row) => total + (row[key] ?? 0), 0)
+      }
+      return recordedRows.length === 0
+        ? null
+        : recordedRows.reduce((total, row) => total + (row[key] ?? 0), 0)
+    }
     return {
       location,
       filled: sum('filled'),
@@ -96,6 +111,52 @@ export function countLocationsHolding(
   state: 'filled' | 'empty' | 'damaged',
 ): number {
   return rows.filter((row) => (row[state] ?? 0) > 0).length
+}
+
+/** Agency-wide stock for one configured cylinder type (productId). */
+export type ProductStockTotal = {
+  product: ProductDoc
+  filled: number | null
+  empty: number | null
+  damaged: number | null
+  locationsOpened: number
+}
+
+/**
+ * Aggregate location stock into one row per configured product id.
+ * Does not merge different productIds. Null means not recorded at any location.
+ */
+export function buildProductStockTotals(
+  stock: readonly LocationStock[],
+  products: readonly ProductDoc[],
+): ProductStockTotal[] {
+  return products.map((product) => {
+    let filled = 0
+    let empty = 0
+    let damaged = 0
+    let locationsOpened = 0
+    let anyOpening = false
+    for (const location of stock) {
+      const row = location.products.find((item) => item.product.id === product.id)
+      if (!row || !row.opened) continue
+      const qtyFilled = row.filled ?? 0
+      const qtyEmpty = row.empty ?? 0
+      const qtyDamaged = row.damaged ?? 0
+      if (row.hasOpening) anyOpening = true
+      // Count locations with an opening record or actual stock (after transfer).
+      if (row.hasOpening || qtyFilled + qtyEmpty + qtyDamaged > 0) {
+        locationsOpened += 1
+      }
+      filled += qtyFilled
+      empty += qtyEmpty
+      damaged += qtyDamaged
+    }
+    // Until at least one opening exists (usually godown), keep agency-wide totals as not recorded.
+    if (!anyOpening) {
+      return { product, filled: null, empty: null, damaged: null, locationsOpened: 0 }
+    }
+    return { product, filled, empty, damaged, locationsOpened }
+  })
 }
 
 export function groupLedgerLines(lines: readonly InventoryLedgerLine[]): LedgerDisplayRow[] {

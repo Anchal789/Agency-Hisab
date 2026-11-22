@@ -83,16 +83,18 @@ describe('navigation permission matrix', () => {
       'vehicles.record',
       'expenses.create',
       'reports.viewAssigned',
+      'finance.manageOpening',
     ])
+    // Phase 5.0: Hisab opening is Admin-only even if a staff finance key exists.
     expect(visibleNavModules('staff', permissions)).toEqual([
       'dashboard',
       'godown',
-      'hisab',
       'customers',
       'inventory',
       'dues',
       'reports',
     ])
+    expect(canViewNavModule('staff', permissions, 'hisab')).toBe(false)
     expect(canViewNavModule('staff', permissions, 'users')).toBe(false)
     expect(canViewNavModule('staff', permissions, 'settings')).toBe(false)
     expect(canViewNavModule('staff', permissions, 'approvals')).toBe(false)

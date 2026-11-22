@@ -20,6 +20,7 @@ import {
   amountsFromReceivedAndDue,
   createGodownSaleSchema,
   derivedSaleQuantities,
+  isDacReceivedDateAllowed,
   recordEmptyReturnSchema,
   reverseGodownSaleSchema,
 } from '../../shared/schemas/godown'
@@ -52,6 +53,7 @@ function sampleSale(overrides: Partial<TransactionDoc> = {}): TransactionDoc {
     receivingAccountName: 'Cash',
     bookingStatus: 'no',
     bookingName: null,
+    dacReceivedDate: null,
     note: '',
     idempotencyKey: 'tx1',
     originTransactionId: null,
@@ -515,6 +517,82 @@ describe('godown schemas', () => {
     const withNote = createGodownSaleSchema.safeParse({ ...validSale, note: '  Paid at counter  ' })
     expect(withNote.success).toBe(true)
     if (withNote.success) expect(withNote.data.note).toBe('Paid at counter')
+  })
+
+  it('accepts optional DAC received date as empty, today, or earlier than the transaction date', () => {
+    expect(createGodownSaleSchema.safeParse({ ...validSale, dacReceivedDate: null }).success).toBe(true)
+    expect(createGodownSaleSchema.safeParse({ ...validSale }).success).toBe(true)
+    expect(createGodownSaleSchema.safeParse({ ...validSale, dacReceivedDate: '' }).success).toBe(true)
+    expect(
+      createGodownSaleSchema.safeParse({
+        ...validSale,
+        businessDate: '2026-11-22',
+        dacReceivedDate: '2026-11-22',
+      }).success,
+    ).toBe(true)
+    expect(
+      createGodownSaleSchema.safeParse({
+        ...validSale,
+        businessDate: '2026-11-22',
+        dacReceivedDate: '2026-11-19',
+      }).success,
+    ).toBe(true)
+  })
+
+  it('rejects DAC received dates after the transaction date', () => {
+    expect(
+      createGodownSaleSchema.safeParse({
+        ...validSale,
+        businessDate: '2026-11-22',
+        dacReceivedDate: '2026-11-23',
+      }).success,
+    ).toBe(false)
+    expect(isDacReceivedDateAllowed('2026-11-23', '2026-11-22', '2026-11-22')).toBe(false)
+    expect(isDacReceivedDateAllowed('2026-11-22', '2026-11-22', '2026-11-21')).toBe(false)
+    expect(isDacReceivedDateAllowed('2026-11-19', '2026-11-22', '2026-11-22')).toBe(true)
+    expect(isDacReceivedDateAllowed(null, '2026-11-22', '2026-11-22')).toBe(true)
+  })
+
+  it('reads existing sales without dacReceivedDate and preserves a saved DAC date', () => {
+    const base = {
+      type: 'godown_sale',
+      status: 'posted',
+      approval: 'not_required',
+      businessDate: '2026-11-22',
+      timezone: 'Asia/Kolkata',
+      customerKind: 'custom',
+      customerId: null,
+      customerSnapshot: {
+        name: 'Walk-in',
+        consumerNumber: null,
+        address: '',
+        city: '',
+        lastRefillDate: null,
+      },
+      locationId: null,
+      productId: 'p1',
+      productName: '14.2 kg',
+      quantities: { filledIssued: 1, emptyReceived: 1, emptyOutstanding: 0 },
+      amountsPaise: { salePaise: 100000, receivedPaise: 100000, duePaise: 0 },
+      paymentMethodId: 'cash',
+      paymentMethodName: 'Cash',
+      receivingAccountId: 'cash',
+      receivingAccountName: 'Cash',
+      bookingStatus: 'yes',
+      note: '',
+      idempotencyKey: 'legacy-dac',
+      createdBy: 'u1',
+      updatedBy: 'u1',
+    }
+    const legacy = parseTransaction('legacy1', base)
+    expect(legacy?.dacReceivedDate).toBeNull()
+    expect(legacy?.amountsPaise.salePaise).toBe(100000)
+    expect(legacy?.customerSnapshot.lastRefillDate).toBeNull()
+
+    const withDac = parseTransaction('dac1', { ...base, dacReceivedDate: '2026-11-19' })
+    expect(withDac?.dacReceivedDate).toBe('2026-11-19')
+    expect(withDac?.businessDate).toBe('2026-11-22')
+    expect(withDac?.quantities.filledIssued).toBe(1)
   })
 
   it('rejects invalid customer combinations', () => {

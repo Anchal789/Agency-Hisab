@@ -47,6 +47,7 @@ import { InventoryReconcilePage } from '@/modules/inventory/InventoryReconcilePa
 import { InventoryReportsPage } from '@/modules/inventory/InventoryReportsPage'
 import { InventoryTransferPage } from '@/modules/inventory/InventoryTransferPage'
 import { SettingsPage } from '@/modules/settings/SettingsPage'
+import { FinancialOpeningPage } from '@/modules/finance/FinancialOpeningPage'
 import { UsersPage } from '@/modules/users/UsersPage'
 import { missingFirebaseEnv } from '@/services/firebase/client'
 
@@ -176,6 +177,7 @@ export function App() {
                 </Route>
                 <Route element={<AdminRoute />}>
                   <Route path="users" element={<UsersPage />} />
+                  <Route path="hisab/opening" element={<FinancialOpeningPage />} />
                 </Route>
               </Route>
             </Route>

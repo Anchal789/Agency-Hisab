@@ -16,6 +16,7 @@ const labels: Record<StaffPermission, string> = {
   'vehicles.record': 'permissions.vehicles.record',
   'expenses.create': 'permissions.expenses.create',
   'reports.viewAssigned': 'permissions.reports.viewAssigned',
+  'finance.manageOpening': 'permissions.finance.manageOpening',
 }
 
 export function permissionLabelKey(permission: StaffPermission): string {

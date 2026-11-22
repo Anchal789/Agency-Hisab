@@ -59,6 +59,53 @@ export function QtyPill({ label, value }: { label: string; value: number | null;
   )
 }
 
+/** Compact Filled / Empty / Damaged figures for one cylinder type. */
+export function CylinderTypeQtyRow({
+  name,
+  code,
+  filled,
+  empty,
+  damaged,
+  missingLabel,
+}: {
+  name: string
+  code?: string
+  filled: number | null
+  empty: number | null
+  damaged: number | null
+  missingLabel: string
+}) {
+  const { t } = useTranslation()
+  return (
+    <div className="rounded-lg border border-border/80 bg-blue-100 px-3 py-2">
+      <p className="truncate text-sm font-medium">
+        {name}
+        {code ? <span className="ml-1 text-xs font-normal text-muted-foreground">({code})</span> : null}
+      </p>
+      <dl className="mt-2 grid grid-cols-3 gap-2 text-sm">
+        <div>
+          <dt className="text-xs text-muted-foreground">{t('inventory.filled')}</dt>
+          <dd>
+            <StockFigure value={filled} missingLabel={missingLabel} />
+          </dd>
+        </div>
+        <div>
+          <dt className="text-xs text-muted-foreground">{t('inventory.empty')}</dt>
+          <dd>
+            <StockFigure value={empty} missingLabel={missingLabel} />
+          </dd>
+        </div>
+        <div>
+          <dt className="text-xs text-muted-foreground">{t('inventory.damaged')}</dt>
+          <dd>
+            <StockFigure value={damaged} missingLabel={missingLabel} />
+          </dd>
+        </div>
+      </dl>
+    </div>
+  )
+}
+
 export function MovementDetailsDialog({
   row,
   locationName,

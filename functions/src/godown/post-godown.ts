@@ -1,4 +1,10 @@
-import { FieldValue, getFirestore, type DocumentReference, type Transaction } from 'firebase-admin/firestore'
+import {
+  FieldValue,
+  getFirestore,
+  type DocumentReference,
+  type DocumentSnapshot,
+  type Transaction,
+} from 'firebase-admin/firestore'
 import * as functions from 'firebase-functions/v1'
 import { AGENCY_TIME_ZONE, businessDateInTimeZone } from '../../../shared/calculations/business-date'
 import {
@@ -28,12 +34,25 @@ import {
   amountsFromReceivedAndDue,
   createGodownSaleSchema,
   derivedSaleQuantities,
+  isDacReceivedDateAllowed,
   recordEmptyReturnSchema,
   reverseGodownSaleSchema,
   updateGodownSaleSchema,
   type CreateGodownSaleInput,
   type UpdateGodownSaleInput,
 } from '../shared/godown-schema'
+import {
+  commitMoneyDueIfNeededInTx,
+  commitPostCutoverSaleFinanceInTx,
+  commitPublishedFinancialReverseInTx,
+  prepareMoneyDueIfNeededInTx,
+  preparePostCutoverSaleFinanceInTx,
+  preparePublishedFinancialReverseInTx,
+  readGateAndPublicationInTx,
+  registerSealingCandidateInTx,
+  type PreparedPublishedFinancialReverse,
+} from '../finance/apply-godown-finance'
+import type { PreparedMoneyObligationCreate } from '../finance/money-obligation-claims'
 
 function firstZodMessage(error: { issues: Array<{ message: string }> }): string {
   return error.issues[0]?.message || 'Check the godown form and try again.'
@@ -218,6 +237,18 @@ async function buildSaleDocument(input: CreateGodownSaleInput | UpdateGodownSale
     )
   }
 
+  const today = businessDateInTimeZone(new Date(), agency.timezone || AGENCY_TIME_ZONE)
+  const dacReceivedDate =
+    typeof input.dacReceivedDate === 'string' && input.dacReceivedDate.trim()
+      ? input.dacReceivedDate.trim()
+      : null
+  if (!isDacReceivedDateAllowed(dacReceivedDate, input.businessDate, today)) {
+    throw new functions.https.HttpsError(
+      'invalid-argument',
+      'DAC received date cannot be in the future or after the transaction date.',
+    )
+  }
+
   return {
     type: 'godown_sale' as const,
     status: 'posted' as const,
@@ -237,6 +268,7 @@ async function buildSaleDocument(input: CreateGodownSaleInput | UpdateGodownSale
     receivingAccountId: receivingAccount?.id ?? null,
     receivingAccountName: receivingAccount?.name ?? null,
     bookingStatus: input.bookingStatus,
+    dacReceivedDate,
     note: input.note ?? '',
     originTransactionId: null,
     reversalOf: null,
@@ -289,6 +321,7 @@ export const createGodownSale = functions.region('asia-south1').https.onCall(asy
       throw new functions.https.HttpsError('not-found', 'Customer not found.')
     }
 
+    const financeGate = await readGateAndPublicationInTx(tx)
     const outstanding = saleFields.quantities.emptyOutstanding
     const inventoryEligible = await assertInventoryEligibleForGodown(tx, {
       businessDate: saleFields.businessDate,
@@ -305,8 +338,9 @@ export const createGodownSale = functions.region('asia-south1').https.onCall(asy
           })
         : []
 
+    let inventoryBalances = null as Awaited<ReturnType<typeof loadBalanceMap>> | null
     if (inventoryLines.length > 0 && saleFields.locationId) {
-      const balances = await loadBalanceMap(
+      inventoryBalances = await loadBalanceMap(
         tx,
         inventoryLines.map((line) => ({
           locationId: line.locationId,
@@ -314,12 +348,60 @@ export const createGodownSale = functions.region('asia-south1').https.onCall(asy
           state: line.state,
         })),
       )
+    }
+
+    let financePrepared: Awaited<ReturnType<typeof preparePostCutoverSaleFinanceInTx>> | null = null
+    let moneyDuePrepared: PreparedMoneyObligationCreate | null = null
+    let historicalPreCutover = false
+    if (
+      financeGate.gateState === 'published' &&
+      financeGate.publishedSessionId &&
+      financeGate.publishedGenerationId
+    ) {
+      const openingDate = agency.financialOpeningDate
+      if (!openingDate) {
+        throw new functions.https.HttpsError(
+          'failed-precondition',
+          'Financial opening is published but opening date is missing.',
+        )
+      }
+      if (saleFields.businessDate <= openingDate) {
+        historicalPreCutover = true
+      } else {
+        financePrepared = await preparePostCutoverSaleFinanceInTx(tx, db, {
+          saleId: txRef.id,
+          businessDate: saleFields.businessDate,
+          openingDate,
+          receivedPaise: saleFields.amountsPaise.receivedPaise,
+          duePaise: saleFields.amountsPaise.duePaise,
+          salePaise: saleFields.amountsPaise.salePaise,
+          accountId: saleFields.receivingAccountId,
+          customerId: saleFields.customerId,
+          customerKind: saleFields.customerKind,
+          customerName: saleFields.customerSnapshot.name,
+          publishedSessionId: financeGate.publishedSessionId,
+          publishedGenerationId: financeGate.publishedGenerationId,
+        })
+        moneyDuePrepared = await prepareMoneyDueIfNeededInTx(tx, db, {
+          saleId: txRef.id,
+          duePaise: saleFields.amountsPaise.duePaise,
+          businessDate: saleFields.businessDate,
+          customerId: saleFields.customerId,
+          customerKind: saleFields.customerKind,
+          customerName: saleFields.customerSnapshot.name,
+          actorUid,
+          enabled: financePrepared.createMoneyDue,
+        })
+      }
+    }
+
+    if (inventoryLines.length > 0 && saleFields.locationId && inventoryBalances) {
       applyLedgerAndBalancesInTx(tx, {
         transactionId: txRef.id,
         businessDate: saleFields.businessDate,
         actorUid,
         lines: inventoryLines,
-        currentBalances: balances,
+        currentBalances: inventoryBalances,
         allowNegative: agency.negativeStockAllowed === true,
       })
     }
@@ -353,6 +435,66 @@ export const createGodownSale = functions.region('asia-south1').https.onCall(asy
         createdAt: FieldValue.serverTimestamp(),
         updatedAt: FieldValue.serverTimestamp(),
       })
+    }
+
+    if (financeGate.gateState === 'sealing') {
+      await registerSealingCandidateInTx(tx, db, {
+        saleId: txRef.id,
+        businessDate: saleFields.businessDate,
+        status: 'posted',
+        receivedPaise: saleFields.amountsPaise.receivedPaise,
+        duePaise: saleFields.amountsPaise.duePaise,
+        receivingAccountId: saleFields.receivingAccountId,
+        customerId: saleFields.customerId,
+        actorUid,
+      })
+    }
+
+    if (
+      financeGate.gateState === 'published' &&
+      financeGate.publishedSessionId &&
+      financeGate.publishedGenerationId
+    ) {
+      if (historicalPreCutover) {
+        commitPostCutoverSaleFinanceInTx(tx, db, {
+          saleId: txRef.id,
+          businessDate: saleFields.businessDate,
+          receivedPaise: saleFields.amountsPaise.receivedPaise,
+          duePaise: saleFields.amountsPaise.duePaise,
+          salePaise: saleFields.amountsPaise.salePaise,
+          accountId: saleFields.receivingAccountId,
+          customerId: saleFields.customerId,
+          customerKind: saleFields.customerKind,
+          customerName: saleFields.customerSnapshot.name,
+          actorUid,
+          publishedSessionId: financeGate.publishedSessionId,
+          publishedGenerationId: financeGate.publishedGenerationId,
+          prepared: {
+            cohort: 'future_dated',
+            ledger: [],
+            balances: new Map(),
+            createMoneyDue: false,
+          },
+          historicalPreCutover: true,
+        })
+      } else if (financePrepared) {
+        commitPostCutoverSaleFinanceInTx(tx, db, {
+          saleId: txRef.id,
+          businessDate: saleFields.businessDate,
+          receivedPaise: saleFields.amountsPaise.receivedPaise,
+          duePaise: saleFields.amountsPaise.duePaise,
+          salePaise: saleFields.amountsPaise.salePaise,
+          accountId: saleFields.receivingAccountId,
+          customerId: saleFields.customerId,
+          customerKind: saleFields.customerKind,
+          customerName: saleFields.customerSnapshot.name,
+          actorUid,
+          publishedSessionId: financeGate.publishedSessionId,
+          publishedGenerationId: financeGate.publishedGenerationId,
+          prepared: financePrepared,
+        })
+        commitMoneyDueIfNeededInTx(tx, db, moneyDuePrepared)
+      }
     }
 
     tx.set(idemRef, {
@@ -547,6 +689,8 @@ export const reverseGodownSale = functions.region('asia-south1').https.onCall(as
     }
     assertTodayBusinessDate(String(current.businessDate ?? ''))
 
+    const financeGate = await readGateAndPublicationInTx(tx)
+
     const returnCount = await findReturnCountForOrigin(tx, txRef.id)
     if (returnCount > 0) {
       throw new functions.https.HttpsError(
@@ -555,26 +699,24 @@ export const reverseGodownSale = functions.region('asia-south1').https.onCall(as
       )
     }
 
+    let emptyObligationRef: DocumentReference | null = null
+    let emptyObligationSnap: DocumentSnapshot | null = null
     if (typeof current.obligationId === 'string' && current.obligationId) {
-      const obligationRef = db.collection('obligations').doc(current.obligationId)
-      const obligationSnap = await tx.get(obligationRef)
-      if (obligationSnap.exists) {
-        const settled = Number(obligationSnap.data()?.settledQuantity ?? 0)
+      emptyObligationRef = db.collection('obligations').doc(current.obligationId)
+      emptyObligationSnap = await tx.get(emptyObligationRef)
+      if (emptyObligationSnap.exists) {
+        const settled = Number(emptyObligationSnap.data()?.settledQuantity ?? 0)
         if (settled > 0) {
           throw new functions.https.HttpsError(
             'failed-precondition',
             'This sale has settled empty cylinders and cannot be deleted from the normal UI.',
           )
         }
-        tx.update(obligationRef, {
-          status: 'reversed',
-          outstanding: 0,
-          updatedBy: actorUid,
-          updatedAt: FieldValue.serverTimestamp(),
-        })
       }
     }
 
+    let inventoryReverseBalances: Awaited<ReturnType<typeof loadBalanceMap>> | null = null
+    let inventoryReverseLines: ReturnType<typeof reverseLedgerLines> = []
     if (current.inventoryApplied === true && typeof current.locationId === 'string' && current.locationId) {
       const quantities = current.quantities ?? {}
       const lines = godownSaleLedgerLines({
@@ -583,25 +725,74 @@ export const reverseGodownSale = functions.region('asia-south1').https.onCall(as
         filledIssued: Number(quantities.filledIssued ?? 0),
         emptyReceived: Number(quantities.emptyReceived ?? 0),
       })
-      const reverseLines = reverseLedgerLines(lines)
-      if (reverseLines.length > 0) {
-        const balances = await loadBalanceMap(
+      inventoryReverseLines = reverseLedgerLines(lines)
+      if (inventoryReverseLines.length > 0) {
+        inventoryReverseBalances = await loadBalanceMap(
           tx,
-          reverseLines.map((line) => ({
+          inventoryReverseLines.map((line) => ({
             locationId: line.locationId,
             productId: line.productId,
             state: line.state,
           })),
         )
-        applyLedgerAndBalancesInTx(tx, {
-          transactionId: `${txRef.id}_rev`,
-          businessDate: String(current.businessDate ?? ''),
-          actorUid,
-          lines: reverseLines,
-          currentBalances: balances,
-          allowNegative: agency.negativeStockAllowed === true,
-        })
       }
+    }
+
+    let publishedReverse: PreparedPublishedFinancialReverse | null = null
+    if (
+      financeGate.gateState === 'published' &&
+      financeGate.publishedSessionId &&
+      financeGate.publishedGenerationId
+    ) {
+      publishedReverse = await preparePublishedFinancialReverseInTx(tx, db, {
+        saleId: txRef.id,
+        businessDate: String(current.businessDate ?? ''),
+        publishedSessionId: financeGate.publishedSessionId,
+        publishedGenerationId: financeGate.publishedGenerationId,
+      })
+    }
+
+    // --- writes only below ---
+    if (emptyObligationRef && emptyObligationSnap?.exists) {
+      tx.update(emptyObligationRef, {
+        status: 'reversed',
+        outstanding: 0,
+        updatedBy: actorUid,
+        updatedAt: FieldValue.serverTimestamp(),
+      })
+    }
+
+    if (inventoryReverseLines.length > 0 && inventoryReverseBalances) {
+      applyLedgerAndBalancesInTx(tx, {
+        transactionId: `${txRef.id}_rev`,
+        businessDate: String(current.businessDate ?? ''),
+        actorUid,
+        lines: inventoryReverseLines,
+        currentBalances: inventoryReverseBalances,
+        allowNegative: agency.negativeStockAllowed === true,
+      })
+    }
+
+    if (financeGate.gateState === 'sealing') {
+      await registerSealingCandidateInTx(tx, db, {
+        saleId: txRef.id,
+        businessDate: String(current.businessDate ?? ''),
+        status: 'reversed',
+        receivedPaise: Number(current.amountsPaise?.receivedPaise ?? 0),
+        duePaise: Number(current.amountsPaise?.duePaise ?? 0),
+        receivingAccountId:
+          typeof current.receivingAccountId === 'string' ? current.receivingAccountId : null,
+        customerId: typeof current.customerId === 'string' ? current.customerId : null,
+        actorUid,
+      })
+    }
+
+    if (publishedReverse) {
+      commitPublishedFinancialReverseInTx(tx, db, {
+        saleId: txRef.id,
+        actorUid,
+        prepared: publishedReverse,
+      })
     }
 
     tx.update(txRef, {
@@ -619,6 +810,7 @@ export const reverseGodownSale = functions.region('asia-south1').https.onCall(as
       transactionId: txRef.id,
       reason: input.reason,
       businessDate: current.businessDate,
+      gateState: financeGate.gateState,
       createdAt: FieldValue.serverTimestamp(),
     })
   })

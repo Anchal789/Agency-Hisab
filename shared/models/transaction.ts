@@ -74,6 +74,11 @@ export type TransactionDoc = {
   bookingStatus: BookingStatus
   /** Legacy-only. New godown writes omit this; kept for reading older records. */
   bookingName: string | null
+  /**
+   * Optional YYYY-MM-DD when the manager received the customer's DAC.
+   * Null when not recorded. Never stores the six-digit DAC itself.
+   */
+  dacReceivedDate: string | null
   note: string
   idempotencyKey: string
   /** Sale that created the empty obligation this return settles. */
@@ -340,6 +345,10 @@ export function parseTransaction(id: string, data: Record<string, unknown>): Tra
     receivingAccountName: typeof data.receivingAccountName === 'string' ? data.receivingAccountName : null,
     bookingStatus,
     bookingName: typeof data.bookingName === 'string' && data.bookingName.trim() ? data.bookingName.trim() : null,
+    dacReceivedDate:
+      typeof data.dacReceivedDate === 'string' && /^\d{4}-\d{2}-\d{2}$/.test(data.dacReceivedDate.trim())
+        ? data.dacReceivedDate.trim()
+        : null,
     note: typeof data.note === 'string' ? data.note.trim() : '',
     idempotencyKey,
     originTransactionId:

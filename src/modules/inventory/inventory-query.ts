@@ -120,6 +120,22 @@ export async function fetchPendingInventoryTransactions(): Promise<TransactionDo
   return results.sort((a, b) => (b.createdAtMs ?? 0) - (a.createdAtMs ?? 0))
 }
 
+/** Posted plant receipts eligible for Financial Opening anchor selection. */
+export async function fetchPostedStockReceipts(limitCount = 100): Promise<TransactionDoc[]> {
+  const snapshot = await getDocs(
+    query(
+      collection(getFirebase().db, 'transactions'),
+      where('status', '==', 'posted'),
+      where('type', '==', 'stock_receipt'),
+      orderBy('createdAt', 'desc'),
+      limit(limitCount),
+    ),
+  )
+  return snapshot.docs
+    .map((doc) => parseTransaction(doc.id, doc.data() as Record<string, unknown>))
+    .filter((row): row is TransactionDoc => row !== null && row.type === 'stock_receipt')
+}
+
 export async function fetchInventoryMasterData(): Promise<{
   locations: LocationDoc[]
   products: ProductDoc[]

@@ -71,12 +71,9 @@ describe('canonical payment categories', () => {
   })
 })
 
-describe('destination filtering by payment method category', () => {
-  it('filters Cash destinations only', () => {
+describe('destination filtering by payment method', () => {
+  it('filters by legacy kind when compatiblePaymentMethodIds are absent', () => {
     expect(destinationsForPaymentMethod(methods.cash, accounts).map((row) => row.name)).toEqual(['Cash Counter'])
-  })
-
-  it('filters UPI destinations only', () => {
     expect(destinationsForPaymentMethod(methods.upi, accounts).map((row) => row.name)).toEqual([
       'Anchal',
       'D.P. Ji',
@@ -84,18 +81,36 @@ describe('destination filtering by payment method category', () => {
     ])
   })
 
-  it('filters Bank destinations only', () => {
+  it('filters Bank and Portal by kind', () => {
     expect(destinationsForPaymentMethod(methods.bank, accounts).map((row) => row.name)).toEqual([
       'Agency Bank Account',
     ])
-  })
-
-  it('filters Indane Portal destinations only', () => {
     expect(destinationsForPaymentMethod(methods.portal, accounts).map((row) => row.name)).toEqual(['Portal'])
+    expect(destinationsForPaymentMethod(methods.other, accounts).map((row) => row.name)).toEqual(['Misc'])
   })
 
-  it('filters Other destinations only', () => {
-    expect(destinationsForPaymentMethod(methods.other, accounts).map((row) => row.name)).toEqual(['Misc'])
+  it('uses compatiblePaymentMethodIds when present (multi-method destination)', () => {
+    const multi: ReceivingAccount[] = [
+      {
+        id: 'ra_anchal',
+        name: 'Anchal',
+        kind: 'cash',
+        active: true,
+        compatiblePaymentMethodIds: ['pm_cash', 'pm_upi'],
+      },
+      {
+        id: 'ra_bank',
+        name: 'Maharashtra Bank',
+        kind: 'bank',
+        active: true,
+        compatiblePaymentMethodIds: ['pm_bank'],
+      },
+    ]
+    expect(destinationsForPaymentMethod(methods.cash, multi).map((row) => row.name)).toEqual(['Anchal'])
+    expect(destinationsForPaymentMethod(methods.upi, multi).map((row) => row.name)).toEqual(['Anchal'])
+    expect(destinationsForPaymentMethod(methods.bank, multi).map((row) => row.name)).toEqual([
+      'Maharashtra Bank',
+    ])
   })
 
   it('clears incompatible destination when payment method changes', () => {
@@ -134,7 +149,16 @@ describe('settings save schema for payment categories', () => {
       manageAgencyConfigSchema.safeParse({
         action: 'setReceivingAccounts',
         payload: {
-          items: [{ id: 'ra1', name: 'Portal', kind: 'portal', active: true }],
+          items: [
+            {
+              id: 'ra1',
+              name: 'Portal',
+              kind: 'indane_portal',
+              active: true,
+              ownership: 'portal',
+              compatiblePaymentMethodIds: ['pm_portal'],
+            },
+          ],
         },
       }).success,
     ).toBe(true)

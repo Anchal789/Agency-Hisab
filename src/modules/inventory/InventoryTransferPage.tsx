@@ -17,7 +17,7 @@ import { createStockTransfer, newInventoryTransactionId } from '@/services/api/i
 import { callableErrorMessage } from '@/services/errors'
 import { QtyPill, selectClass } from './InventoryWidgets'
 import { todayBusinessDate, useInventoryMasters } from './InventoryFormShared'
-import { fetchInventoryBalances, fetchInventoryOpenings } from './inventory-query'
+import { fetchInventoryBalances } from './inventory-query'
 import { parseQty } from './inventory-stock'
 
 const STATES = ['filled', 'empty', 'damaged'] as const
@@ -29,7 +29,6 @@ export function InventoryTransferPage() {
   const queryClient = useQueryClient()
   const masters = useInventoryMasters()
   const balancesQuery = useQuery({ queryKey: ['inventory-balances'], queryFn: fetchInventoryBalances })
-  const openingsQuery = useQuery({ queryKey: ['inventory-openings'], queryFn: fetchInventoryOpenings })
   const allowed = Boolean(role && profile && canCreateInventoryTransfer(role, profile.permissions))
   const postsNow = role === 'admin'
 
@@ -50,15 +49,17 @@ export function InventoryTransferPage() {
     if (from) setSource(from)
   }, [params])
 
-  const sourceOpen = (openingsQuery.data ?? []).some((row) => row.locationId === sourceLocationId && row.productId === productId)
-  const destOpen = (openingsQuery.data ?? []).some((row) => row.locationId === destinationLocationId && row.productId === productId)
+  /** Available stock is the posted ledger balance — opening stock is not required. */
   const available = useMemo(() => {
     const qty = (state: InventoryState) => {
-      if (!sourceOpen) return null
-      return balancesQuery.data?.find((row) => row.id === inventoryBalanceId(sourceLocationId, productId, state))?.quantity ?? 0
+      if (!sourceLocationId || !productId) return null
+      return (
+        balancesQuery.data?.find((row) => row.id === inventoryBalanceId(sourceLocationId, productId, state))
+          ?.quantity ?? 0
+      )
     }
     return { filled: qty('filled'), empty: qty('empty'), damaged: qty('damaged') }
-  }, [balancesQuery.data, sourceLocationId, productId, sourceOpen])
+  }, [balancesQuery.data, sourceLocationId, productId])
 
   const quantities = {
     filled: parseQty(filled),
@@ -69,8 +70,9 @@ export function InventoryTransferPage() {
   function validate(): string | null {
     if (!sourceLocationId || !destinationLocationId || !productId) return t('inventory.transferRequired')
     if (sourceLocationId === destinationLocationId) return t('inventory.sameLocation')
-    if (!sourceOpen || !destOpen) return t('inventory.bothNeedOpening')
-    if (quantities.filled === null || quantities.empty === null || quantities.damaged === null) return t('inventory.qtyInvalid')
+    if (quantities.filled === null || quantities.empty === null || quantities.damaged === null) {
+      return t('inventory.qtyInvalid')
+    }
     const planned = STATES.filter((state) => (quantities[state] ?? 0) > 0)
     if (planned.length === 0) return t('inventory.atLeastOne')
     for (const state of planned) {
@@ -142,18 +144,37 @@ export function InventoryTransferPage() {
         }}
       >
         <div className="grid gap-3 sm:grid-cols-2">
-          <FormField label={t('inventory.source')} error={sourceLocationId && sourceLocationId === destinationLocationId ? t('inventory.sameLocation') : undefined}>
+          <FormField
+            label={t('inventory.source')}
+            error={
+              sourceLocationId && sourceLocationId === destinationLocationId
+                ? t('inventory.sameLocation')
+                : undefined
+            }
+          >
             <select className={selectClass} value={sourceLocationId} onChange={(event) => setSource(event.target.value)}>
               <option value="">{t('inventory.selectPlaceholder')}</option>
-              {masters.data.locations.map((row) => <option key={row.id} value={row.id}>{row.name}</option>)}
+              {masters.data.locations.map((row) => (
+                <option key={row.id} value={row.id}>
+                  {row.name}
+                </option>
+              ))}
             </select>
           </FormField>
           <FormField label={t('inventory.destination')}>
-            <select className={selectClass} value={destinationLocationId} onChange={(event) => setDest(event.target.value)}>
+            <select
+              className={selectClass}
+              value={destinationLocationId}
+              onChange={(event) => setDest(event.target.value)}
+            >
               <option value="">{t('inventory.selectPlaceholder')}</option>
-              {masters.data.locations.filter((row) => row.id !== sourceLocationId).map((row) => (
-                <option key={row.id} value={row.id}>{row.name}</option>
-              ))}
+              {masters.data.locations
+                .filter((row) => row.id !== sourceLocationId)
+                .map((row) => (
+                  <option key={row.id} value={row.id}>
+                    {row.name}
+                  </option>
+                ))}
             </select>
           </FormField>
         </div>
@@ -161,7 +182,11 @@ export function InventoryTransferPage() {
           <FormField label={t('inventory.product')}>
             <select className={selectClass} value={productId} onChange={(event) => setProductId(event.target.value)}>
               <option value="">{t('inventory.selectPlaceholder')}</option>
-              {masters.data.products.map((row) => <option key={row.id} value={row.id}>{row.name}</option>)}
+              {masters.data.products.map((row) => (
+                <option key={row.id} value={row.id}>
+                  {row.name}
+                </option>
+              ))}
             </select>
           </FormField>
           <FormField label={t('inventory.businessDate')}>
@@ -176,20 +201,28 @@ export function InventoryTransferPage() {
               <QtyPill label={t('inventory.empty')} value={available.empty} />
               <QtyPill label={t('inventory.damaged')} value={available.damaged} />
             </div>
-            {!sourceOpen || (destinationLocationId && !destOpen) ? (
-              <p className="mt-2 text-sm text-destructive">{t('inventory.bothNeedOpening')}</p>
-            ) : null}
+            <p className="mt-2 text-sm text-muted-foreground">{t('inventory.transferDestZeroHint')}</p>
           </div>
         ) : null}
         <div className="grid gap-3 sm:grid-cols-3">
-          <FormField label={t('inventory.filledToMove')}><Input inputMode="numeric" value={filled} onChange={(event) => setFilled(event.target.value)} /></FormField>
-          <FormField label={t('inventory.emptyToMove')}><Input inputMode="numeric" value={empty} onChange={(event) => setEmpty(event.target.value)} /></FormField>
-          <FormField label={t('inventory.damagedToMove')}><Input inputMode="numeric" value={damaged} onChange={(event) => setDamaged(event.target.value)} /></FormField>
+          <FormField label={t('inventory.filledToMove')}>
+            <Input inputMode="numeric" value={filled} onChange={(event) => setFilled(event.target.value)} />
+          </FormField>
+          <FormField label={t('inventory.emptyToMove')}>
+            <Input inputMode="numeric" value={empty} onChange={(event) => setEmpty(event.target.value)} />
+          </FormField>
+          <FormField label={t('inventory.damagedToMove')}>
+            <Input inputMode="numeric" value={damaged} onChange={(event) => setDamaged(event.target.value)} />
+          </FormField>
         </div>
-        <FormField label={t('inventory.note')}><Input value={note} onChange={(event) => setNote(event.target.value)} /></FormField>
+        <FormField label={t('inventory.note')}>
+          <Input value={note} onChange={(event) => setNote(event.target.value)} />
+        </FormField>
         <p className="text-sm text-muted-foreground">{t('inventory.transferSeparateNote')}</p>
         {error ? <p className="text-sm text-destructive">{error}</p> : null}
-        <Button type="submit" variant="accent">{t('inventory.review')}</Button>
+        <Button type="submit" variant="accent">
+          {t('inventory.review')}
+        </Button>
       </form>
 
       <ConfirmationDialog
@@ -201,14 +234,20 @@ export function InventoryTransferPage() {
         onOpenChange={setReviewOpen}
         onConfirm={() => void save()}
       >
-        <p className="text-sm font-medium">{nameOf(sourceLocationId)} → {nameOf(destinationLocationId)}</p>
+        <p className="text-sm font-medium">
+          {nameOf(sourceLocationId)} → {nameOf(destinationLocationId)}
+        </p>
         <p className="text-sm">{productName}</p>
         <ul className="text-sm">
           {STATES.filter((state) => (quantities[state] ?? 0) > 0).map((state) => (
-            <li key={state}>{t(`inventory.${state}`)}: {quantities[state]}</li>
+            <li key={state}>
+              {t(`inventory.${state}`)}: {quantities[state]}
+            </li>
           ))}
         </ul>
-        <p className="text-sm text-muted-foreground">{postsNow ? t('inventory.adminPostHint') : t('inventory.staffPendingHint')}</p>
+        <p className="text-sm text-muted-foreground">
+          {postsNow ? t('inventory.adminPostHint') : t('inventory.staffPendingHint')}
+        </p>
       </ConfirmationDialog>
     </div>
   )

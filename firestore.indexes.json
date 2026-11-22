@@ -72,6 +72,67 @@
         { "fieldPath": "locationId", "order": "ASCENDING" },
         { "fieldPath": "productId", "order": "ASCENDING" }
       ]
+    },
+    {
+      "collectionGroup": "financialLedger",
+      "queryScope": "COLLECTION",
+      "fields": [
+        { "fieldPath": "recordScope", "order": "ASCENDING" },
+        { "fieldPath": "accountId", "order": "ASCENDING" },
+        { "fieldPath": "businessDate", "order": "ASCENDING" }
+      ]
+    },
+    {
+      "collectionGroup": "financialLedger",
+      "queryScope": "COLLECTION",
+      "fields": [
+        { "fieldPath": "recordScope", "order": "ASCENDING" },
+        { "fieldPath": "openingSessionId", "order": "ASCENDING" },
+        { "fieldPath": "openingGenerationId", "order": "ASCENDING" },
+        { "fieldPath": "accountId", "order": "ASCENDING" }
+      ]
+    },
+    {
+      "collectionGroup": "obligations",
+      "queryScope": "COLLECTION",
+      "fields": [
+        { "fieldPath": "kind", "order": "ASCENDING" },
+        { "fieldPath": "customerId", "order": "ASCENDING" },
+        { "fieldPath": "status", "order": "ASCENDING" }
+      ]
+    },
+    {
+      "collectionGroup": "obligations",
+      "queryScope": "COLLECTION",
+      "fields": [
+        { "fieldPath": "kind", "order": "ASCENDING" },
+        { "fieldPath": "originTransactionId", "order": "ASCENDING" }
+      ]
+    },
+    {
+      "collectionGroup": "openingReceivableReviews",
+      "queryScope": "COLLECTION",
+      "fields": [
+        { "fieldPath": "openingSessionId", "order": "ASCENDING" },
+        { "fieldPath": "openingGenerationId", "order": "ASCENDING" }
+      ]
+    },
+    {
+      "collectionGroup": "transactions",
+      "queryScope": "COLLECTION",
+      "fields": [
+        { "fieldPath": "type", "order": "ASCENDING" },
+        { "fieldPath": "status", "order": "ASCENDING" },
+        { "fieldPath": "businessDate", "order": "ASCENDING" }
+      ]
+    },
+    {
+      "collectionGroup": "financialBalances",
+      "queryScope": "COLLECTION",
+      "fields": [
+        { "fieldPath": "publishedSessionId", "order": "ASCENDING" },
+        { "fieldPath": "publishedGenerationId", "order": "ASCENDING" }
+      ]
     }
   ],
   "fieldOverrides": []

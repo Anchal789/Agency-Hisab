@@ -18,7 +18,7 @@ describe('Firestore security rules', () => {
   beforeAll(async () => {
     testEnv = await initializeTestEnvironment({
       projectId: PROJECT_ID,
-      firestore: { rules, host: '127.0.0.1', port: 8080 },
+      firestore: { rules, host: '127.0.0.1', port: 8081 },
     })
   }, 180_000)
 
@@ -72,11 +72,58 @@ describe('Firestore security rules', () => {
         approval: 'pending',
         createdBy: 'staff1',
       })
-      await setDoc(doc(db, 'financialLedger/fl1'), { amountPaise: 100, transactionId: 'tx1' })
-      await setDoc(doc(db, 'financialBalances/cash'), { balancePaise: 100 })
+      await setDoc(doc(db, 'financePublication/current'), {
+        publishedSessionId: 'sess_pub',
+        publishedGenerationId: 'gen_pub',
+        publishedAt: new Date(),
+      })
+      await setDoc(doc(db, 'financialLedger/fl1'), {
+        amountPaise: 100,
+        transactionId: 'tx1',
+        recordScope: 'operational',
+        accountId: 'cash',
+        direction: 'credit',
+        entryClass: 'sale_collection',
+      })
+      await setDoc(doc(db, 'financialBalances/cash'), {
+        balancePaise: 100,
+        accountId: 'cash',
+        publishedSessionId: 'sess_pub',
+        publishedGenerationId: 'gen_pub',
+        needsReconciliation: false,
+        reconciliationReason: null,
+      })
+      await setDoc(doc(db, 'financialLedger/fl_opening_stale'), {
+        amountPaise: 50,
+        transactionId: 'tx_open',
+        recordScope: 'opening',
+        openingSessionId: 'sess_old',
+        openingGenerationId: 'gen_old',
+        accountId: 'cash',
+        direction: 'credit',
+        entryClass: 'destination_opening',
+      })
+      await setDoc(doc(db, 'financialBalances/cash_stale'), {
+        balancePaise: 50,
+        accountId: 'cash_stale',
+        publishedSessionId: 'sess_old',
+        publishedGenerationId: 'gen_old',
+        needsReconciliation: false,
+        reconciliationReason: null,
+      })
       await setDoc(doc(db, 'inventoryLedger/il1'), { quantityDelta: -1, transactionId: 'tx1' })
       await setDoc(doc(db, 'inventoryBalances/godown_filled'), { quantity: 10 })
-      await setDoc(doc(db, 'obligations/ob1'), { kind: 'money', outstanding: 5000 })
+      await setDoc(doc(db, 'obligations/ob1'), {
+        kind: 'empty_cylinder',
+        outstanding: 1,
+        status: 'open',
+      })
+      await setDoc(doc(db, 'obligations/money_ob1'), {
+        kind: 'money',
+        outstandingAmountPaise: 5000,
+        status: 'open',
+        recordScope: 'operational',
+      })
       await setDoc(doc(db, 'auditLogs/a1'), { action: 'test', actorUid: 'admin1' })
       await setDoc(doc(db, 'locations/godown1'), { name: 'Main Godown', kind: 'godown', active: true })
       await setDoc(doc(db, 'products/cyl1'), { name: '14.2 kg', code: 'DOM142', kind: 'cylinder', unit: 'cylinder', active: true })
@@ -268,6 +315,7 @@ describe('Firestore security rules', () => {
 
       await assertSucceeds(getDoc(doc(godownView.firestore(), 'transactions/tx1')))
       await assertSucceeds(getDoc(doc(godownView.firestore(), 'obligations/ob1')))
+      await assertFails(getDoc(doc(godownView.firestore(), 'obligations/money_ob1')))
       await assertFails(getDoc(doc(customersOnly.firestore(), 'transactions/tx1')))
       await assertFails(getDoc(doc(godownCreateOnly.firestore(), 'transactions/tx1')))
       await assertFails(getDoc(doc(godownView.firestore(), 'financialLedger/fl1')))
@@ -295,6 +343,14 @@ describe('Firestore security rules', () => {
       await assertSucceeds(getDoc(doc(admin.firestore(), 'auditLogs/a1')))
       await assertSucceeds(getDoc(doc(admin.firestore(), 'financialLedger/fl1')))
       await assertSucceeds(getDoc(doc(admin.firestore(), 'financialBalances/cash')))
+    })
+
+    it('denies admin reads of stale opening ledger and mismatched balance projections', async () => {
+      const admin = testEnv.authenticatedContext('admin1', { role: 'admin' })
+      await assertFails(getDoc(doc(admin.firestore(), 'financialLedger/fl_opening_stale')))
+      await assertFails(getDoc(doc(admin.firestore(), 'financialBalances/cash_stale')))
+      await assertFails(getDoc(doc(admin.firestore(), 'moneyObligationOriginClaims/sale1')))
+      await assertFails(getDoc(doc(admin.firestore(), 'openingPlans/plan1')))
     })
   })
 

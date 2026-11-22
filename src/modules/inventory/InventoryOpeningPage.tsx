@@ -46,8 +46,19 @@ export function InventoryOpeningPage() {
     () => new Set((openingsQuery.data ?? []).filter((row) => row.locationId === locationId).map((row) => row.productId)),
     [openingsQuery.data, locationId],
   )
-  const locationName = masters.data?.locations.find((row) => row.id === locationId)?.name ?? ''
+  const selectedLocation = masters.data?.locations.find((row) => row.id === locationId)
+  const locationName = selectedLocation?.name ?? ''
+  const isNonGodownOpening = Boolean(selectedLocation && selectedLocation.kind !== 'godown')
   const productName = (id: string) => masters.data?.products.find((row) => row.id === id)?.name ?? id
+
+  const godownLocations = useMemo(
+    () => (masters.data?.locations ?? []).filter((row) => row.kind === 'godown'),
+    [masters.data],
+  )
+  const otherLocations = useMemo(
+    () => (masters.data?.locations ?? []).filter((row) => row.kind !== 'godown'),
+    [masters.data],
+  )
 
   function updateRow(key: string, patch: Partial<OpeningRow>) {
     setRows((current) => current.map((row) => (row.key === key ? { ...row, ...patch } : row)))
@@ -57,6 +68,7 @@ export function InventoryOpeningPage() {
   function validate(): string | null {
     if (!locationId) return t('inventory.locationRequired')
     if (!/^\d{4}-\d{2}-\d{2}$/.test(businessDate)) return t('inventory.dateRequired')
+    if (isNonGodownOpening && note.trim().length < 3) return t('inventory.nonGodownOpeningReason')
     const chosen = rows.filter((row) => row.productId)
     if (chosen.length === 0) return t('inventory.atLeastOne')
     const seen = new Set<string>()
@@ -117,13 +129,31 @@ export function InventoryOpeningPage() {
   return (
     <div>
       <PageHeader title={t('inventory.navOpening')} description={t('inventory.openingBody')} />
+      <p className="mb-4 rounded-xl border border-border bg-card px-4 py-3 text-sm text-muted-foreground">
+        {t('inventory.openingGodownFirstHint')}
+      </p>
       <div className="mb-4 grid gap-3 rounded-xl border border-border bg-card p-4 sm:grid-cols-2">
         <FormField label={t('inventory.location')}>
           <select className={selectClass} value={locationId} onChange={(event) => setLocationId(event.target.value)}>
             <option value="">{t('inventory.selectPlaceholder')}</option>
-            {masters.data.locations.map((row) => (
-              <option key={row.id} value={row.id}>{row.name}</option>
-            ))}
+            {godownLocations.length > 0 ? (
+              <optgroup label={t('inventory.godownLocationsGroup')}>
+                {godownLocations.map((row) => (
+                  <option key={row.id} value={row.id}>
+                    {row.name}
+                  </option>
+                ))}
+              </optgroup>
+            ) : null}
+            {otherLocations.length > 0 ? (
+              <optgroup label={t('inventory.exceptionLocationsGroup')}>
+                {otherLocations.map((row) => (
+                  <option key={row.id} value={row.id}>
+                    {row.name} · {t(`inventory.kind.${row.kind}`)}
+                  </option>
+                ))}
+              </optgroup>
+            ) : null}
           </select>
         </FormField>
         <FormField label={t('inventory.businessDate')}>
@@ -136,6 +166,9 @@ export function InventoryOpeningPage() {
               date: formatBusinessDate(businessDate, i18n.language),
             })}
           </p>
+        ) : null}
+        {isNonGodownOpening ? (
+          <p className="text-sm text-amber-900 sm:col-span-2">{t('inventory.nonGodownOpeningWarning')}</p>
         ) : null}
       </div>
 
@@ -187,7 +220,10 @@ export function InventoryOpeningPage() {
               {t('inventory.addProduct')}
             </Button>
           </div>
-          <FormField label={t('inventory.note')}>
+          <FormField
+            label={isNonGodownOpening ? t('inventory.nonGodownOpeningReasonLabel') : t('inventory.note')}
+            hint={isNonGodownOpening ? t('inventory.nonGodownOpeningReasonHint') : undefined}
+          >
             <Input value={note} onChange={(event) => setNote(event.target.value)} />
           </FormField>
           {error ? <p className="text-sm text-destructive">{error}</p> : null}

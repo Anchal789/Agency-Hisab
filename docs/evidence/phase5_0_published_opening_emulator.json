@@ -1,0 +1,217 @@
+{
+  "capturedAt": "2026-11-22T19:34:06.626Z",
+  "projectId": "hisab-9d3e4",
+  "emulator": "127.0.0.1:8081",
+  "session": {
+    "id": "9b618b21-824a-4d16-934f-c93754447648",
+    "generationId": "gen_mws7ampa_mnapjzo9",
+    "anchorDateMismatchReason": null,
+    "createdBy": "0N47Z9swKiy8AJhzOtJlYT3GFlqu",
+    "anchorTransactionId": "c97dfabe-dc0a-4566-98f8-1e33acffd9de",
+    "mutationEpochAtPlan": 0,
+    "fence": 1,
+    "openingDate": "2026-11-19",
+    "anchorBusinessDate": "2026-11-19",
+    "createdAt": {
+      "_seconds": 1795373951,
+      "_nanoseconds": 151000000
+    },
+    "readyBy": "0N47Z9swKiy8AJhzOtJlYT3GFlqu",
+    "state": "published",
+    "publishedAt": {
+      "_seconds": 1795375367,
+      "_nanoseconds": 808000000
+    },
+    "updatedAt": {
+      "_seconds": 1795375367,
+      "_nanoseconds": 808000000
+    }
+  },
+  "gate": {
+    "updatedBy": "0N47Z9swKiy8AJhzOtJlYT3GFlqu",
+    "mutationEpoch": 0,
+    "activeSessionId": "9b618b21-824a-4d16-934f-c93754447648",
+    "state": "published",
+    "updatedAt": {
+      "_seconds": 1795375367,
+      "_nanoseconds": 808000000
+    }
+  },
+  "publication": {
+    "publishedSessionId": "9b618b21-824a-4d16-934f-c93754447648",
+    "publishedGenerationId": "gen_mws7ampa_mnapjzo9",
+    "publishedAt": {
+      "_seconds": 1795375367,
+      "_nanoseconds": 808000000
+    }
+  },
+  "agency": {
+    "financialOpeningDate": "2026-11-19",
+    "ownerLoanOutstandingPaise": 0
+  },
+  "balanceSheet": {
+    "ownerLoanOutstandingPaise": 0,
+    "ownerLoanVerified": true,
+    "amountsPaise": {
+      "ra_94b230e3-3ea3-42db-8b21-dc05a8b60706": 0,
+      "ra_2c614f5d-2edb-41e0-829c-50c570301e43": 0,
+      "ra_1e2b38c5-6fc8-40d9-9083-d7eb149ad974": 0,
+      "ra_b1371980-16ec-4d81-8567-fffc6411d4ec": 0,
+      "ra_5a2c83d2-655c-46e0-89ac-b4fed6c1c855": 0,
+      "ra_1063acd8-b3ab-4f33-ad3b-268454e31747": 0,
+      "ra_4e9554a8-7020-49e0-9741-23d95fc0414a": 0,
+      "ra_5f44999c-e49e-447a-bb1b-e28787e70768": 0
+    },
+    "sessionId": "9b618b21-824a-4d16-934f-c93754447648",
+    "verifiedBy": "0N47Z9swKiy8AJhzOtJlYT3GFlqu",
+    "openingGenerationId": "gen_mws7ampa_mnapjzo9",
+    "verifiedAt": {
+      "_seconds": 1795373973,
+      "_nanoseconds": 33000000
+    }
+  },
+  "rollup": {
+    "ownerLoanOutstandingPaise": 0,
+    "builtBy": "0N47Z9swKiy8AJhzOtJlYT3GFlqu",
+    "verifiedOpeningPaise": {
+      "ra_94b230e3-3ea3-42db-8b21-dc05a8b60706": 0,
+      "ra_2c614f5d-2edb-41e0-829c-50c570301e43": 0,
+      "ra_1e2b38c5-6fc8-40d9-9083-d7eb149ad974": 0,
+      "ra_b1371980-16ec-4d81-8567-fffc6411d4ec": 0,
+      "ra_5a2c83d2-655c-46e0-89ac-b4fed6c1c855": 0,
+      "ra_1063acd8-b3ab-4f33-ad3b-268454e31747": 0,
+      "ra_4e9554a8-7020-49e0-9741-23d95fc0414a": 0,
+      "ra_5f44999c-e49e-447a-bb1b-e28787e70768": 0
+    },
+    "bridgeCollectionNetPaise": {},
+    "sessionId": "9b618b21-824a-4d16-934f-c93754447648",
+    "openingGenerationId": "gen_mws7ampa_mnapjzo9",
+    "publishedBalancePaise": {
+      "ra_94b230e3-3ea3-42db-8b21-dc05a8b60706": 0,
+      "ra_2c614f5d-2edb-41e0-829c-50c570301e43": 0,
+      "ra_1e2b38c5-6fc8-40d9-9083-d7eb149ad974": 0,
+      "ra_b1371980-16ec-4d81-8567-fffc6411d4ec": 0,
+      "ra_5a2c83d2-655c-46e0-89ac-b4fed6c1c855": 0,
+      "ra_1063acd8-b3ab-4f33-ad3b-268454e31747": 0,
+      "ra_4e9554a8-7020-49e0-9741-23d95fc0414a": 0,
+      "ra_5f44999c-e49e-447a-bb1b-e28787e70768": 0
+    },
+    "builtAt": {
+      "_seconds": 1795374034,
+      "_nanoseconds": 283000000
+    }
+  },
+  "financialBalances": [
+    {
+      "id": "ra_1063acd8-b3ab-4f33-ad3b-268454e31747",
+      "balancePaise": 0,
+      "publishedSessionId": "9b618b21-824a-4d16-934f-c93754447648",
+      "publishedGenerationId": "gen_mws7ampa_mnapjzo9",
+      "needsReconciliation": false
+    },
+    {
+      "id": "ra_1e2b38c5-6fc8-40d9-9083-d7eb149ad974",
+      "balancePaise": 0,
+      "publishedSessionId": "9b618b21-824a-4d16-934f-c93754447648",
+      "publishedGenerationId": "gen_mws7ampa_mnapjzo9",
+      "needsReconciliation": false
+    },
+    {
+      "id": "ra_2c614f5d-2edb-41e0-829c-50c570301e43",
+      "balancePaise": 100000,
+      "publishedSessionId": "9b618b21-824a-4d16-934f-c93754447648",
+      "publishedGenerationId": "gen_mws7ampa_mnapjzo9",
+      "needsReconciliation": false
+    },
+    {
+      "id": "ra_4e9554a8-7020-49e0-9741-23d95fc0414a",
+      "balancePaise": 0,
+      "publishedSessionId": "9b618b21-824a-4d16-934f-c93754447648",
+      "publishedGenerationId": "gen_mws7ampa_mnapjzo9",
+      "needsReconciliation": false
+    },
+    {
+      "id": "ra_5a2c83d2-655c-46e0-89ac-b4fed6c1c855",
+      "balancePaise": 0,
+      "publishedSessionId": "9b618b21-824a-4d16-934f-c93754447648",
+      "publishedGenerationId": "gen_mws7ampa_mnapjzo9",
+      "needsReconciliation": false
+    },
+    {
+      "id": "ra_5f44999c-e49e-447a-bb1b-e28787e70768",
+      "balancePaise": 0,
+      "publishedSessionId": "9b618b21-824a-4d16-934f-c93754447648",
+      "publishedGenerationId": "gen_mws7ampa_mnapjzo9",
+      "needsReconciliation": false
+    },
+    {
+      "id": "ra_94b230e3-3ea3-42db-8b21-dc05a8b60706",
+      "balancePaise": 0,
+      "publishedSessionId": "9b618b21-824a-4d16-934f-c93754447648",
+      "publishedGenerationId": "gen_mws7ampa_mnapjzo9",
+      "needsReconciliation": false
+    },
+    {
+      "id": "ra_b1371980-16ec-4d81-8567-fffc6411d4ec",
+      "balancePaise": 0,
+      "publishedSessionId": "9b618b21-824a-4d16-934f-c93754447648",
+      "publishedGenerationId": "gen_mws7ampa_mnapjzo9",
+      "needsReconciliation": false
+    }
+  ],
+  "inventoryBalanceSnapshot": [
+    {
+      "id": "5s2YtweSHHc4wZQE6Ihq_zefJ0slRCeX2VdwCSWDv_filled",
+      "quantity": 0,
+      "locationId": "5s2YtweSHHc4wZQE6Ihq",
+      "productId": "zefJ0slRCeX2VdwCSWDv",
+      "state": "filled"
+    },
+    {
+      "id": "DilyRRopUbBYAB1Tio96_lVrODLT0Qao5Y3byo4KS_empty",
+      "quantity": 31,
+      "locationId": "DilyRRopUbBYAB1Tio96",
+      "productId": "lVrODLT0Qao5Y3byo4KS",
+      "state": "empty"
+    },
+    {
+      "id": "DilyRRopUbBYAB1Tio96_zefJ0slRCeX2VdwCSWDv_empty",
+      "quantity": 1,
+      "locationId": "DilyRRopUbBYAB1Tio96",
+      "productId": "zefJ0slRCeX2VdwCSWDv",
+      "state": "empty"
+    },
+    {
+      "id": "DilyRRopUbBYAB1Tio96_zefJ0slRCeX2VdwCSWDv_filled",
+      "quantity": 341,
+      "locationId": "DilyRRopUbBYAB1Tio96",
+      "productId": "zefJ0slRCeX2VdwCSWDv",
+      "state": "filled"
+    },
+    {
+      "id": "YiwQXfmY0QgbZrANcHky_zefJ0slRCeX2VdwCSWDv_filled",
+      "quantity": 0,
+      "locationId": "YiwQXfmY0QgbZrANcHky",
+      "productId": "zefJ0slRCeX2VdwCSWDv",
+      "state": "filled"
+    },
+    {
+      "id": "nlWcWaXECjhcLiTHANQc_zefJ0slRCeX2VdwCSWDv_filled",
+      "quantity": 0,
+      "locationId": "nlWcWaXECjhcLiTHANQc",
+      "productId": "zefJ0slRCeX2VdwCSWDv",
+      "state": "filled"
+    }
+  ],
+  "verificationNote": "Refreshed after Phase 5.0 acceptance pass. Post-publish operational sale_collection of 100000 paise on ra_2c614f5d is expected and does not alter published opening rollup.",
+  "operationalLedgerSample": [
+    {
+      "id": "6a81e157-b402-4073-ba8d-b659e78b40e1_ra_2c614f5d-2edb-41e0-829c-50c570301e43_sale_collection",
+      "accountId": "ra_2c614f5d-2edb-41e0-829c-50c570301e43",
+      "amountPaise": 100000,
+      "direction": "credit",
+      "entryClass": "sale_collection",
+      "recordScope": "operational"
+    }
+  ]
+}

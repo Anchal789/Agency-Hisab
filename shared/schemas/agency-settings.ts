@@ -6,6 +6,11 @@ import {
   normalizePaymentCategory,
   PAYMENT_CATEGORIES,
 } from '../models/agency-config'
+import {
+  findDuplicateConfigKeyInList,
+  paymentMethodUniquenessKey,
+  receivingAccountUniquenessKey,
+} from '../rules/settings-uniqueness'
 
 /** Callable JSON often turns missing ids into null; treat null/empty as “create”. */
 const optionalDocIdSchema = z.preprocess((value) => {
@@ -28,20 +33,24 @@ const paymentMethodSchema = namedItemSchema.extend({
   kind: paymentCategorySchema,
 })
 
+const ownershipSchema = z.enum(['agency', 'third_party_held', 'portal'])
+
 const receivingAccountSchema = namedItemSchema.extend({
   kind: paymentCategorySchema,
+  ownership: ownershipSchema.optional(),
+  compatiblePaymentMethodIds: z.array(z.string().trim().min(1).max(80)).max(40).optional(),
 })
 
-function noDuplicateNames<T extends { name: string; id: string }>(items: T[], ctx: z.RefinementCtx, path: string) {
-  const seen = new Map<string, string>()
-  for (const item of items) {
-    const key = item.name.trim().toLowerCase()
-    const previous = seen.get(key)
-    if (previous && previous !== item.id) {
-      ctx.addIssue({ code: z.ZodIssueCode.custom, message: 'Duplicate names are not allowed.', path: [path] })
-      return
-    }
-    seen.set(key, item.id)
+function noDuplicateNameCategoryKeys<T extends { id: string; name: string; kind: string }>(
+  items: T[],
+  ctx: z.RefinementCtx,
+  path: string,
+  keyFor: (item: T) => string,
+  message: string,
+) {
+  const duplicate = findDuplicateConfigKeyInList(items, keyFor)
+  if (duplicate) {
+    ctx.addIssue({ code: z.ZodIssueCode.custom, message, path: [path] })
   }
 }
 
@@ -64,13 +73,29 @@ export const setPaymentMethodsSchema = z
   .object({
     items: z.array(paymentMethodSchema).max(40),
   })
-  .superRefine((value, ctx) => noDuplicateNames(value.items, ctx, 'items'))
+  .superRefine((value, ctx) =>
+    noDuplicateNameCategoryKeys(
+      value.items,
+      ctx,
+      'items',
+      paymentMethodUniquenessKey,
+      'Duplicate payment method names are not allowed within the same category.',
+    ),
+  )
 
 export const setReceivingAccountsSchema = z
   .object({
     items: z.array(receivingAccountSchema).max(40),
   })
-  .superRefine((value, ctx) => noDuplicateNames(value.items, ctx, 'items'))
+  .superRefine((value, ctx) =>
+    noDuplicateNameCategoryKeys(
+      value.items,
+      ctx,
+      'items',
+      receivingAccountUniquenessKey,
+      'Duplicate destination names are not allowed within the same category.',
+    ),
+  )
 
 export const upsertLocationSchema = z.object({
   id: optionalDocIdSchema,

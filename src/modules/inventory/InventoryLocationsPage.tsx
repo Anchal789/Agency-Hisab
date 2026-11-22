@@ -12,7 +12,13 @@ import { LoadingState } from '@/components/common/LoadingState'
 import { PageHeader } from '@/components/common/PageHeader'
 import { SearchInput } from '@/components/forms/SearchInput'
 import { Button } from '@/components/ui/button'
-import { MovementDetailsDialog, selectClass, SignedQty, StockFigure } from './InventoryWidgets'
+import {
+  CylinderTypeQtyRow,
+  MovementDetailsDialog,
+  selectClass,
+  SignedQty,
+  StockFigure,
+} from './InventoryWidgets'
 import {
   fetchInventoryBalances,
   fetchInventoryLedger,
@@ -112,10 +118,38 @@ export function InventoryLocationsPage() {
                   </div>
                   <span className="text-sm font-medium text-accent">{t('inventory.view')}</span>
                 </div>
-                <dl className="mt-3 grid grid-cols-3 gap-2 text-sm">
-                  <div><dt className="text-muted-foreground">{t('inventory.filled')}</dt><dd><StockFigure value={row.filled} missingLabel={t('inventory.notRecordedShort')} /></dd></div>
-                  <div><dt className="text-muted-foreground">{t('inventory.empty')}</dt><dd><StockFigure value={row.empty} missingLabel={t('inventory.notRecordedShort')} /></dd></div>
-                  <div><dt className="text-muted-foreground">{t('inventory.damaged')}</dt><dd><StockFigure value={row.damaged} missingLabel={t('inventory.notRecordedShort')} /></dd></div>
+                <div className="mt-3 space-y-2">
+                  {row.products.map((product) => (
+                    <CylinderTypeQtyRow
+                      key={product.product.id}
+                      name={product.product.name}
+                      code={product.product.code}
+                      filled={product.filled}
+                      empty={product.empty}
+                      damaged={product.damaged}
+                      missingLabel={t('inventory.notRecordedShort')}
+                    />
+                  ))}
+                </div>
+                <dl className="mt-3 grid grid-cols-3 gap-2 border-t border-border pt-3 text-sm">
+                  <div>
+                    <dt className="text-xs text-muted-foreground">{t('inventory.locationTotalFilled')}</dt>
+                    <dd>
+                      <StockFigure value={row.filled} missingLabel={t('inventory.notRecordedShort')} />
+                    </dd>
+                  </div>
+                  <div>
+                    <dt className="text-xs text-muted-foreground">{t('inventory.locationTotalEmpty')}</dt>
+                    <dd>
+                      <StockFigure value={row.empty} missingLabel={t('inventory.notRecordedShort')} />
+                    </dd>
+                  </div>
+                  <div>
+                    <dt className="text-xs text-muted-foreground">{t('inventory.locationTotalDamaged')}</dt>
+                    <dd>
+                      <StockFigure value={row.damaged} missingLabel={t('inventory.notRecordedShort')} />
+                    </dd>
+                  </div>
                 </dl>
               </button>
             ))
@@ -138,27 +172,38 @@ export function InventoryLocationsPage() {
                   </Button>
                 ) : null}
               </div>
-              <div className="overflow-x-auto">
-                <table className="min-w-full text-sm">
-                  <thead className="text-left text-muted-foreground">
-                    <tr>
-                      <th className="py-2 pr-3 font-medium">{t('inventory.product')}</th>
-                      <th className="py-2 pr-3 font-medium">{t('inventory.filled')}</th>
-                      <th className="py-2 pr-3 font-medium">{t('inventory.empty')}</th>
-                      <th className="py-2 font-medium">{t('inventory.damaged')}</th>
-                    </tr>
-                  </thead>
-                  <tbody>
-                    {selected.products.map((product) => (
-                      <tr key={product.product.id} className="border-t border-border">
-                        <td className="py-2 pr-3">{product.product.name}</td>
-                        <td className="py-2 pr-3"><StockFigure value={product.filled} missingLabel={t('inventory.notRecordedShort')} /></td>
-                        <td className="py-2 pr-3"><StockFigure value={product.empty} missingLabel={t('inventory.notRecordedShort')} /></td>
-                        <td className="py-2"><StockFigure value={product.damaged} missingLabel={t('inventory.notRecordedShort')} /></td>
-                      </tr>
-                    ))}
-                  </tbody>
-                </table>
+              <div className="space-y-2" data-testid="location-cylinder-breakdown">
+                {selected.products.map((product) => (
+                  <CylinderTypeQtyRow
+                    key={product.product.id}
+                    name={product.product.name}
+                    code={product.product.code}
+                    filled={product.filled}
+                    empty={product.empty}
+                    damaged={product.damaged}
+                    missingLabel={t('inventory.notRecordedShort')}
+                  />
+                ))}
+                <dl className="grid grid-cols-3 gap-2 rounded-lg border border-border bg-muted/30 px-3 py-2 text-sm">
+                  <div>
+                    <dt className="text-xs text-muted-foreground">{t('inventory.locationTotalFilled')}</dt>
+                    <dd>
+                      <StockFigure value={selected.filled} missingLabel={t('inventory.notRecordedShort')} />
+                    </dd>
+                  </div>
+                  <div>
+                    <dt className="text-xs text-muted-foreground">{t('inventory.locationTotalEmpty')}</dt>
+                    <dd>
+                      <StockFigure value={selected.empty} missingLabel={t('inventory.notRecordedShort')} />
+                    </dd>
+                  </div>
+                  <div>
+                    <dt className="text-xs text-muted-foreground">{t('inventory.locationTotalDamaged')}</dt>
+                    <dd>
+                      <StockFigure value={selected.damaged} missingLabel={t('inventory.notRecordedShort')} />
+                    </dd>
+                  </div>
+                </dl>
               </div>
               <div>
                 <h3 className="mb-2 font-semibold">{t('inventory.locationHistory')}</h3>

@@ -18,12 +18,18 @@
     "../shared/schemas/agency-settings.ts",
     "../shared/schemas/customer.ts",
     "../shared/schemas/godown.ts",
+    "../shared/schemas/finance-opening.ts",
     "../shared/models/agency-config.ts",
     "../shared/models/customer.ts",
     "../shared/models/money.ts",
     "../shared/models/transaction.ts",
+    "../shared/models/finance.ts",
     "../shared/calculations/business-date.ts",
+    "../shared/calculations/finance-classification.ts",
     "../shared/rules/permissions.ts",
-    "../shared/rules/payment-destinations.ts"
+    "../shared/rules/payment-destinations.ts",
+    "../shared/rules/destination-ownership.ts",
+    "../shared/rules/settings-uniqueness.ts",
+    "../shared/rules/opening-anchor.ts"
   ]
 }

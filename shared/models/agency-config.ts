@@ -31,8 +31,21 @@ export type PaymentMethod = NamedConfigItem & {
   kind: PaymentCategory
 }
 
+export type ReceivingAccountOwnership = 'agency' | 'third_party_held' | 'portal'
+
 export type ReceivingAccount = NamedConfigItem & {
+  /**
+   * Primary category for display and legacy Godown filtering.
+   * Prefer `compatiblePaymentMethodIds` when present.
+   */
   kind: PaymentCategory
+  /** Phase 5 destination ownership. Required on every active destination before financial opening. */
+  ownership?: ReceivingAccountOwnership
+  /**
+   * Payment method IDs this destination accepts.
+   * Empty/absent = legacy behaviour: match by `kind` only.
+   */
+  compatiblePaymentMethodIds?: string[]
 }
 
 export type AgencySettingsDoc = {
@@ -45,6 +58,10 @@ export type AgencySettingsDoc = {
   inventoryStates: string[]
   /** YYYY-MM-DD; null until inventory opening cutover is established. */
   inventoryCutoverDate: string | null
+  /** YYYY-MM-DD; set when financial opening is published. */
+  financialOpeningDate: string | null
+  /** Owner loan liability in paise; verified at financial opening. */
+  ownerLoanOutstandingPaise: number
   negativeStockAllowed: boolean
   historicalCorrectionRequiresSecondAdmin: boolean
 }
@@ -167,6 +184,20 @@ function asPaymentMethods(input: unknown): PaymentMethod[] {
     .filter((item): item is PaymentMethod => item !== null)
 }
 
+function asOwnership(value: unknown): ReceivingAccountOwnership | undefined {
+  if (value === 'agency' || value === 'third_party_held' || value === 'portal') return value
+  return undefined
+}
+
+function asCompatibleMethodIds(value: unknown): string[] | undefined {
+  if (!Array.isArray(value)) return undefined
+  const ids = value
+    .filter((item): item is string => typeof item === 'string')
+    .map((item) => item.trim())
+    .filter((item) => item.length > 0)
+  return ids.length > 0 ? [...new Set(ids)] : undefined
+}
+
 function asReceivingAccounts(input: unknown): ReceivingAccount[] {
   if (!Array.isArray(input)) return []
   return input
@@ -180,7 +211,16 @@ function asReceivingAccounts(input: unknown): ReceivingAccount[] {
         normalizePaymentCategory(row.kind) ??
         (name ? inferPaymentCategoryFromName(name) : null)
       if (!id || !name || !kind) return null
-      return { id, name, kind, active: row.active !== false }
+      const ownership = asOwnership(row.ownership)
+      const compatiblePaymentMethodIds = asCompatibleMethodIds(row.compatiblePaymentMethodIds)
+      return {
+        id,
+        name,
+        kind,
+        active: row.active !== false,
+        ...(ownership ? { ownership } : {}),
+        ...(compatiblePaymentMethodIds ? { compatiblePaymentMethodIds } : {}),
+      }
     })
     .filter((item): item is ReceivingAccount => item !== null)
 }
@@ -201,6 +241,16 @@ export function parseAgencySettings(data: Record<string, unknown> | undefined): 
       typeof source.inventoryCutoverDate === 'string' && /^\d{4}-\d{2}-\d{2}$/.test(source.inventoryCutoverDate)
         ? source.inventoryCutoverDate
         : null,
+    financialOpeningDate:
+      typeof source.financialOpeningDate === 'string' && /^\d{4}-\d{2}-\d{2}$/.test(source.financialOpeningDate)
+        ? source.financialOpeningDate
+        : null,
+    ownerLoanOutstandingPaise:
+      typeof source.ownerLoanOutstandingPaise === 'number' &&
+      Number.isSafeInteger(source.ownerLoanOutstandingPaise) &&
+      source.ownerLoanOutstandingPaise >= 0
+        ? source.ownerLoanOutstandingPaise
+        : 0,
     negativeStockAllowed: source.negativeStockAllowed === true,
     historicalCorrectionRequiresSecondAdmin: source.historicalCorrectionRequiresSecondAdmin === true,
   }

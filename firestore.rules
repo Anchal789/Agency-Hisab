@@ -134,12 +134,123 @@ service cloud.firestore {
       allow read, create, update, delete: if false;
     }
 
+    function financePublication() {
+      return get(/databases/$(database)/documents/financePublication/current).data;
+    }
+
+    function publicationPointerLive() {
+      return financePublication().publishedSessionId is string
+        && financePublication().publishedGenerationId is string;
+    }
+
+    function openingRecordVisible() {
+      return publicationPointerLive()
+        && resource.data.recordScope == 'opening'
+        && resource.data.openingSessionId == financePublication().publishedSessionId
+        && resource.data.openingGenerationId == financePublication().publishedGenerationId;
+    }
+
+    function operationalLedgerVisible() {
+      return resource.data.recordScope == 'operational';
+    }
+
+    function balanceMatchesPointer() {
+      return publicationPointerLive()
+        && resource.data.publishedSessionId == financePublication().publishedSessionId
+        && resource.data.publishedGenerationId == financePublication().publishedGenerationId;
+    }
+
     match /financialLedger/{id} {
-      allow read: if isAdmin();
+      // Admin-only in Phase 5.0. Queries must constrain recordScope (+ opening session/generation).
+      allow get: if isAdmin() && (operationalLedgerVisible() || openingRecordVisible());
+      allow list: if isAdmin() && (operationalLedgerVisible() || openingRecordVisible());
       allow create, update, delete: if false;
     }
 
     match /financialBalances/{id} {
+      // Aggregate projection — not recordScope. Admin-only; must match publication pointer.
+      allow get: if isAdmin() && balanceMatchesPointer();
+      allow list: if isAdmin() && balanceMatchesPointer();
+      allow create, update, delete: if false;
+    }
+
+    match /financePublication/{id} {
+      allow get: if isAdmin() && id == 'current';
+      allow list: if false;
+      allow create, update, delete: if false;
+    }
+
+    match /financialOpeningGate/{id} {
+      allow get: if isAdmin();
+      allow list: if false;
+      allow create, update, delete: if false;
+    }
+
+    match /openingSessions/{id} {
+      allow read, write: if false;
+    }
+
+    match /openingSessions/{id}/{document=**} {
+      allow read, write: if false;
+    }
+
+    match /openingPlans/{id} {
+      allow read, write: if false;
+    }
+
+    match /openingChunks/{id} {
+      allow read, write: if false;
+    }
+
+    match /openingChunkCompletions/{id} {
+      allow read, write: if false;
+    }
+
+    match /openingReceivableReviews/{id} {
+      allow read, write: if false;
+    }
+
+    match /openingBalanceSheets/{id} {
+      allow read, write: if false;
+    }
+
+    match /openingRollups/{id} {
+      allow read, write: if false;
+    }
+
+    match /openingCollectionSnapshots/{id} {
+      allow get: if isAdmin() && openingRecordVisible();
+      allow list: if isAdmin() && openingRecordVisible();
+      allow create, update, delete: if false;
+    }
+
+    match /saleCutoverRecords/{id} {
+      allow get: if isAdmin() && (operationalLedgerVisible() || openingRecordVisible());
+      allow list: if isAdmin() && (operationalLedgerVisible() || openingRecordVisible());
+      allow create, update, delete: if false;
+    }
+
+    match /financeCutoverCandidates/{id} {
+      allow read, write: if false;
+    }
+
+    match /moneyObligationOriginClaims/{id} {
+      allow read, write: if false;
+    }
+
+    match /moneyObligationLinkClaims/{id} {
+      allow read, write: if false;
+    }
+
+    match /paymentAllocations/{id} {
+      allow read, write: if false;
+    }
+
+    match /creditApplications/{id} {
+      allow read, write: if false;
+    }
+
+    match /reconciliationEvents/{id} {
       allow read: if isAdmin();
       allow create, update, delete: if false;
     }
@@ -160,7 +271,19 @@ service cloud.firestore {
     }
 
     match /obligations/{id} {
-      allow read: if canViewGodown();
+      // Empty-cylinder obligations keep Godown visibility. Money/opening kinds are Admin-only with scope checks.
+      allow get: if (resource.data.kind == 'empty_cylinder' && canViewGodown())
+        || (isAdmin() && resource.data.kind == 'money' && (
+          !('recordScope' in resource.data)
+          || resource.data.recordScope == 'operational'
+          || openingRecordVisible()
+        ));
+      allow list: if (resource.data.kind == 'empty_cylinder' && canViewGodown())
+        || (isAdmin() && resource.data.kind == 'money' && (
+          !('recordScope' in resource.data)
+          || resource.data.recordScope == 'operational'
+          || openingRecordVisible()
+        ));
       allow create, update, delete: if false;
     }
 

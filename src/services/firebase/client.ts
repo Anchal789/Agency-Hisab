@@ -53,7 +53,7 @@ export function getFirebase(): FirebaseServices {
 
   if (import.meta.env.VITE_USE_EMULATORS === 'true' && !globalThis.__HISAB_EMULATORS__) {
     connectAuthEmulator(auth, 'http://127.0.0.1:9099', { disableWarnings: true })
-    connectFirestoreEmulator(db, '127.0.0.1', 8080)
+    connectFirestoreEmulator(db, '127.0.0.1', 8081)
     connectFunctionsEmulator(functions, '127.0.0.1', 5001)
     connectStorageEmulator(storage, '127.0.0.1', 9199)
     globalThis.__HISAB_EMULATORS__ = true

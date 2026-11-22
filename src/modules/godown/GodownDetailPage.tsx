@@ -158,6 +158,16 @@ export function GodownDetailPage() {
                 <dt className="text-xs text-muted-foreground">{t('godown.booking')}</dt>
                 <dd>{tx.bookingStatus === 'yes' ? t('godown.bookingYes') : t('godown.bookingNo')}</dd>
               </div>
+              {tx.type === 'godown_sale' ? (
+                <div>
+                  <dt className="text-xs text-muted-foreground">{t('godown.dacReceivedDate')}</dt>
+                  <dd>
+                    {tx.dacReceivedDate
+                      ? formatBusinessDate(tx.dacReceivedDate, i18n.language)
+                      : t('godown.dacReceivedDateEmpty')}
+                  </dd>
+                </div>
+              ) : null}
               <div>
                 <dt className="text-xs text-muted-foreground">{t('godown.entryType')}</dt>
                 <dd>{tx.type === 'godown_sale' ? t('godown.sale') : t('godown.emptyReturn')}</dd>

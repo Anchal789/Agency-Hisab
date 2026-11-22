@@ -6,7 +6,7 @@ import type { CustomerDoc } from '@shared/models/customer'
 import { formatPaise, rupeesToPaise, MoneyFormatError } from '@shared/models/money'
 import { emptyOutstandingFromIssue } from '@shared/models/transaction'
 import { destinationsForPaymentMethod } from '@shared/rules/payment-destinations'
-import { amountsFromReceivedAndDue } from '@shared/schemas/godown'
+import { amountsFromReceivedAndDue, isDacReceivedDateAllowed } from '@shared/schemas/godown'
 import type { GodownConfig } from '@/modules/godown/godown-config-query'
 import { CustomerPicker } from '@/modules/godown/CustomerPicker'
 import { FormField } from '@/components/forms/FormField'
@@ -30,6 +30,8 @@ export type GodownSaleFormValues = {
   paymentMethodId: string
   receivingAccountId: string
   bookingStatus: 'yes' | 'no'
+  /** YYYY-MM-DD or empty when not recorded. Defaults to today in the form. */
+  dacReceivedDate: string
   note: string
 }
 
@@ -37,8 +39,9 @@ export function defaultGodownSaleValues(config?: GodownConfig): GodownSaleFormVa
   const defaultProduct = config?.products[0]?.id ?? ''
   const defaultLocation =
     config?.locations.find((row) => row.kind === 'godown')?.id ?? config?.locations[0]?.id ?? ''
+  const today = businessDateInTimeZone(new Date(), AGENCY_TIME_ZONE)
   return {
-    businessDate: businessDateInTimeZone(new Date(), AGENCY_TIME_ZONE),
+    businessDate: today,
     customerKind: 'registered',
     customerId: null,
     customCustomerName: '',
@@ -52,6 +55,7 @@ export function defaultGodownSaleValues(config?: GodownConfig): GodownSaleFormVa
     paymentMethodId: '',
     receivingAccountId: '',
     bookingStatus: 'yes',
+    dacReceivedDate: today,
     note: '',
   }
 }
@@ -171,6 +175,15 @@ export function GodownSaleForm({
       }
     }
 
+    if (values.dacReceivedDate.trim()) {
+      const today = businessDateInTimeZone(new Date(), AGENCY_TIME_ZONE)
+      if (!/^\d{4}-\d{2}-\d{2}$/.test(values.dacReceivedDate)) {
+        errors.dacReceivedDate = t('godown.validation.dacReceivedDate')
+      } else if (!isDacReceivedDateAllowed(values.dacReceivedDate, values.businessDate, today)) {
+        errors.dacReceivedDate = t('godown.validation.dacReceivedDateFuture')
+      }
+    }
+
     setFieldErrors(errors)
     if (Object.keys(errors).length > 0) {
       const first = Object.values(errors)[0]
@@ -252,6 +265,28 @@ export function GodownSaleForm({
             </Button>
           ))}
         </div>
+        <FormField
+          className="mt-4"
+          label={t('godown.dacReceivedDate')}
+          hint={t('godown.dacReceivedDateHint')}
+          error={fieldErrors.dacReceivedDate}
+          htmlFor="dac-received-date"
+        >
+          <div className="flex flex-wrap items-center gap-2">
+            <Input
+              id="dac-received-date"
+              type="date"
+              value={values.dacReceivedDate}
+              max={values.businessDate}
+              onChange={(event) => patch({ dacReceivedDate: event.target.value })}
+            />
+            {values.dacReceivedDate ? (
+              <Button type="button" size="sm" variant="outline" onClick={() => patch({ dacReceivedDate: '' })}>
+                {t('godown.clearDacReceivedDate')}
+              </Button>
+            ) : null}
+          </div>
+        </FormField>
       </FormSection>
 
       <FormSection title={t('godown.sectionCylinders')}>
@@ -417,6 +452,7 @@ export function saleFormToPayload(values: GodownSaleFormValues) {
     paymentMethodId: values.paymentMethodId || null,
     receivingAccountId: values.receivingAccountId || null,
     bookingStatus: values.bookingStatus,
+    dacReceivedDate: values.dacReceivedDate.trim() ? values.dacReceivedDate.trim() : null,
     note: note || null,
   }
 }

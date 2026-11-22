@@ -19,7 +19,7 @@ import { createStockReconciliation, newInventoryTransactionId } from '@/services
 import { callableErrorMessage } from '@/services/errors'
 import { MovementDetailsDialog, selectClass } from './InventoryWidgets'
 import { todayBusinessDate, useInventoryMasters } from './InventoryFormShared'
-import { fetchInventoryBalances, fetchInventoryLedger, fetchInventoryOpenings } from './inventory-query'
+import { fetchInventoryBalances, fetchInventoryLedger } from './inventory-query'
 import { groupLedgerLines, parseQty, type LedgerDisplayRow } from './inventory-stock'
 
 function variance(system: number, actual: number): number {
@@ -34,7 +34,6 @@ export function InventoryReconcilePage() {
   const queryClient = useQueryClient()
   const masters = useInventoryMasters()
   const balancesQuery = useQuery({ queryKey: ['inventory-balances'], queryFn: fetchInventoryBalances })
-  const openingsQuery = useQuery({ queryKey: ['inventory-openings'], queryFn: fetchInventoryOpenings })
   const historyQuery = useQuery({
     queryKey: ['inventory-ledger', 'adjustments'],
     queryFn: () => fetchInventoryLedger({}),
@@ -54,14 +53,16 @@ export function InventoryReconcilePage() {
   const [pending, setPending] = useState(false)
   const [selected, setSelected] = useState<LedgerDisplayRow | null>(null)
 
-  const opened = (openingsQuery.data ?? []).some((row) => row.locationId === locationId && row.productId === productId)
+  /** System counts come from posted balances — opening is not required after transfer-in stock. */
   const system = useMemo(() => {
     const qty = (state: 'filled' | 'empty' | 'damaged') => {
-      if (!opened) return null
-      return balancesQuery.data?.find((row) => row.id === inventoryBalanceId(locationId, productId, state))?.quantity ?? 0
+      if (!locationId || !productId) return null
+      return (
+        balancesQuery.data?.find((row) => row.id === inventoryBalanceId(locationId, productId, state))?.quantity ?? 0
+      )
     }
     return { filled: qty('filled'), empty: qty('empty'), damaged: qty('damaged') }
-  }, [balancesQuery.data, locationId, productId, opened])
+  }, [balancesQuery.data, locationId, productId])
 
   const actual = {
     filled: parseQty(actualFilled),
@@ -83,7 +84,9 @@ export function InventoryReconcilePage() {
 
   function validate(): string | null {
     if (!locationId || !productId) return t('inventory.locationProductRequired')
-    if (!opened || system.filled === null || system.empty === null || system.damaged === null) return t('inventory.needOpening')
+    if (system.filled === null || system.empty === null || system.damaged === null) {
+      return t('inventory.locationProductRequired')
+    }
     if (actual.filled === null || actual.empty === null || actual.damaged === null) return t('inventory.qtyInvalid')
     const changed =
       actual.filled !== system.filled || actual.empty !== system.empty || actual.damaged !== system.damaged
@@ -177,8 +180,7 @@ export function InventoryReconcilePage() {
               </select>
             </FormField>
           </div>
-          {locationId && productId && !opened ? <p className="text-sm text-destructive">{t('inventory.needOpening')}</p> : null}
-          {opened && system.filled !== null && system.empty !== null && system.damaged !== null ? (
+          {locationId && productId && system.filled !== null && system.empty !== null && system.damaged !== null ? (
             <div className="overflow-x-auto rounded-xl border border-border bg-card">
               <table className="min-w-full text-sm">
                 <thead className="bg-muted/50 text-left">
@@ -190,21 +192,33 @@ export function InventoryReconcilePage() {
                   </tr>
                 </thead>
                 <tbody>
-                  {([
-                    ['filled', system.filled, actualFilled, setActualFilled, actual.filled],
-                    ['empty', system.empty, actualEmpty, setActualEmpty, actual.empty],
-                    ['damaged', system.damaged, actualDamaged, setActualDamaged, actual.damaged],
-                  ] as const).map(([state, systemQty, value, setValue, parsed]) => {
+                  {(
+                    [
+                      ['filled', system.filled, actualFilled, setActualFilled, actual.filled],
+                      ['empty', system.empty, actualEmpty, setActualEmpty, actual.empty],
+                      ['damaged', system.damaged, actualDamaged, setActualDamaged, actual.damaged],
+                    ] as const
+                  ).map(([state, systemQty, value, setValue, parsed]) => {
                     const diff = parsed === null ? null : variance(systemQty, parsed)
                     return (
                       <tr key={state} className="border-t border-border">
                         <td className="px-3 py-2 font-medium">{t(`inventory.${state}`)}</td>
                         <td className="px-3 py-2 tabular-nums">{systemQty}</td>
                         <td className="px-3 py-2">
-                          <Input inputMode="numeric" value={value} onChange={(event) => setValue(event.target.value)} />
+                          <Input
+                            inputMode="numeric"
+                            value={value}
+                            onChange={(event) => setValue(event.target.value)}
+                          />
                         </td>
                         <td className="px-3 py-2">
-                          {diff === null ? '—' : diff === 0 ? t('inventory.matches') : diff < 0 ? t('inventory.shortage', { count: Math.abs(diff) }) : t('inventory.excess', { count: diff })}
+                          {diff === null
+                            ? '—'
+                            : diff === 0
+                              ? t('inventory.matches')
+                              : diff < 0
+                                ? t('inventory.shortage', { count: Math.abs(diff) })
+                                : t('inventory.excess', { count: diff })}
                         </td>
                       </tr>
                     )

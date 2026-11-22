@@ -262,7 +262,16 @@ export const createStockOpening = functions.region('asia-south1').https.onCall(a
   }
   const input = parsed.data
   const { locations } = await loadLookups()
-  requireActiveLocation(locations, input.locationId)
+  const openingLocation = requireActiveLocation(locations, input.locationId)
+  if (openingLocation.kind !== 'godown') {
+    const reason = (input.note ?? '').trim()
+    if (reason.length < 3) {
+      throw new functions.https.HttpsError(
+        'invalid-argument',
+        'Enter a reason when recording opening stock outside the main godown (existing physical stock exception).',
+      )
+    }
+  }
 
   let openingAgencyRead: Awaited<ReturnType<typeof readAgencyInTx>> | null = null
 
@@ -394,7 +403,7 @@ export const createStockReceipt = functions.region('asia-south1').https.onCall(a
       customerKind: 'custom',
       customerId: null,
       customerSnapshot: {
-        name: 'Distributor receipt',
+        name: 'Plant receipt',
         consumerNumber: null,
         address: '',
         city: '',
@@ -466,7 +475,7 @@ export const createStockReturnToDistributor = functions.region('asia-south1').ht
       customerKind: 'custom',
       customerId: null,
       customerSnapshot: {
-        name: 'Return to distributor',
+        name: 'Return to plant',
         consumerNumber: null,
         address: '',
         city: '',
@@ -570,16 +579,8 @@ export const createStockTransfer = functions.region('asia-south1').https.onCall(
         quantity: input.quantity,
       },
     }),
-    prepareInTx: async (tx) => {
-      const sourceOpen = await openingExistsInTx(tx, input.sourceLocationId, input.productId)
-      const destOpen = await openingExistsInTx(tx, input.destinationLocationId, input.productId)
-      if (!sourceOpen || !destOpen) {
-        throw new functions.https.HttpsError(
-          'failed-precondition',
-          'Both source and destination need opening stock for this cylinder type before transfer.',
-        )
-      }
-    },
+    // Available stock is the ledger balance, not inventoryOpenings.
+    // Source/destination may have never had an opening row (e.g. agent stock from a prior transfer).
   })
 })
 
@@ -671,15 +672,7 @@ export const createStockReconciliation = functions.region('asia-south1').https.o
         reason: input.reason,
       },
     }),
-    prepareInTx: async (tx) => {
-      const opened = await openingExistsInTx(tx, input.locationId, input.productId)
-      if (!opened) {
-        throw new functions.https.HttpsError(
-          'failed-precondition',
-          'Record opening stock before reconciling this location and product.',
-        )
-      }
-    },
+    // System quantities come from inventoryBalances; opening is not required after transfer-in stock.
   })
 })
 
@@ -803,17 +796,10 @@ export const approveInventoryTransaction = functions.region('asia-south1').https
     } else {
       const locationId = String(current.locationId ?? lines[0]?.locationId ?? '')
       const productId = String(current.productId ?? '')
-      if (current.type === 'stock_transfer') {
-        const payload = current.inventoryPayload as Record<string, unknown>
-        const sourceOpen = await openingExistsInTx(tx, String(payload.sourceLocationId), productId)
-        const destOpen = await openingExistsInTx(tx, String(payload.destinationLocationId), productId)
-        if (!sourceOpen || !destOpen) {
-          throw new functions.https.HttpsError(
-            'failed-precondition',
-            'Both locations need opening stock before this transfer can be approved.',
-          )
-        }
+      if (current.type === 'stock_transfer' || current.type === 'stock_reconciliation') {
+        // Balance sufficiency is enforced by applyLedgerAndBalancesInTx. Opening is not required.
       } else if (locationId && productId) {
+        // Plant receive/return still require an initialized location+product (normally godown opening).
         const opened = await openingExistsInTx(tx, locationId, productId)
         if (!opened) {
           throw new functions.https.HttpsError(

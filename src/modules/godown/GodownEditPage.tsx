@@ -73,6 +73,7 @@ export function GodownEditPage() {
         paymentMethodId: tx.paymentMethodId ?? '',
         receivingAccountId: tx.receivingAccountId ?? '',
         bookingStatus: tx.bookingStatus,
+        dacReceivedDate: tx.dacReceivedDate ?? '',
         note: tx.note,
       })
     }

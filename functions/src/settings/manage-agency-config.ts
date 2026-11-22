@@ -1,16 +1,40 @@
 import { FieldValue, getFirestore } from 'firebase-admin/firestore'
 import * as functions from 'firebase-functions/v1'
+import {
+  locationUniquenessKey,
+  normalizeConfigName,
+  priceRuleUniquenessKey,
+  productNameUniquenessKey,
+} from '../../../shared/rules/settings-uniqueness'
 import { manageAgencyConfigSchema } from '../shared/agency-schema'
 import { requireAdmin } from '../auth/guards'
 
 function normalizeNameKey(value: string): string {
-  return value.trim().toLowerCase()
+  return normalizeConfigName(value)
 }
 
-async function assertUniqueLocationName(name: string, exceptId?: string): Promise<void> {
-  const snap = await getFirestore().collection('locations').where('nameLower', '==', normalizeNameKey(name)).limit(5).get()
-  if (snap.docs.some((doc) => doc.id !== exceptId)) {
-    throw new functions.https.HttpsError('already-exists', 'A location with this name already exists.')
+async function assertUniqueLocationNameKind(
+  name: string,
+  kind: string,
+  exceptId?: string,
+): Promise<void> {
+  const snap = await getFirestore()
+    .collection('locations')
+    .where('nameLower', '==', normalizeNameKey(name))
+    .limit(20)
+    .get()
+  const key = locationUniquenessKey({ name, kind })
+  if (
+    snap.docs.some((doc) => {
+      if (doc.id === exceptId) return false
+      const data = doc.data()
+      return locationUniquenessKey({ name: String(data.name ?? ''), kind: String(data.kind ?? '') }) === key
+    })
+  ) {
+    throw new functions.https.HttpsError(
+      'already-exists',
+      'A location with this name already exists in the same category.',
+    )
   }
 }
 
@@ -18,6 +42,53 @@ async function assertUniqueProductCode(code: string, exceptId?: string): Promise
   const snap = await getFirestore().collection('products').where('codeLower', '==', normalizeNameKey(code)).limit(5).get()
   if (snap.docs.some((doc) => doc.id !== exceptId)) {
     throw new functions.https.HttpsError('already-exists', 'A product with this code already exists.')
+  }
+}
+
+async function assertUniqueProductNameKind(
+  name: string,
+  kind: string,
+  exceptId?: string,
+): Promise<void> {
+  const snap = await getFirestore().collection('products').limit(200).get()
+  const key = productNameUniquenessKey({ name, kind })
+  if (
+    snap.docs.some((doc) => {
+      if (doc.id === exceptId) return false
+      const data = doc.data()
+      return productNameUniquenessKey({ name: String(data.name ?? ''), kind: String(data.kind ?? '') }) === key
+    })
+  ) {
+    throw new functions.https.HttpsError(
+      'already-exists',
+      'A cylinder type with this name already exists in the same category.',
+    )
+  }
+}
+
+async function assertUniquePriceLabelForProduct(
+  productId: string,
+  label: string,
+  exceptId?: string,
+): Promise<void> {
+  const snap = await getFirestore().collection('priceRules').where('productId', '==', productId).limit(50).get()
+  const key = priceRuleUniquenessKey({ label, productId })
+  if (
+    snap.docs.some((doc) => {
+      if (doc.id === exceptId) return false
+      const data = doc.data()
+      return (
+        priceRuleUniquenessKey({
+          label: String(data.label ?? ''),
+          productId: String(data.productId ?? ''),
+        }) === key
+      )
+    })
+  ) {
+    throw new functions.https.HttpsError(
+      'already-exists',
+      'A price with this label already exists for the selected product.',
+    )
   }
 }
 
@@ -76,13 +147,47 @@ export const manageAgencyConfig = functions
     }
 
     if (action === 'setReceivingAccounts') {
+      const nextItems = parsed.data.payload.items
+      const agencySnap = await agencyRef.get()
+      const previous = Array.isArray(agencySnap.data()?.receivingAccounts)
+        ? (agencySnap.data()?.receivingAccounts as Array<{ id?: string }>)
+        : []
+      const nextIds = new Set(nextItems.map((item) => item.id))
+      const removedIds = previous
+        .map((row) => (typeof row.id === 'string' ? row.id : ''))
+        .filter((id) => id && !nextIds.has(id))
+
+      for (const removedId of removedIds) {
+        const [ledgerHit, txHit] = await Promise.all([
+          db.collection('financialLedger').where('accountId', '==', removedId).limit(1).get(),
+          db.collection('transactions').where('receivingAccountId', '==', removedId).limit(1).get(),
+        ])
+        if (!ledgerHit.empty || !txHit.empty) {
+          throw new functions.https.HttpsError(
+            'failed-precondition',
+            'This payment destination is already used in financial records. Deactivate it instead of removing it.',
+          )
+        }
+        const balanceHit = await db.collection('financialBalances').doc(removedId).get()
+        if (balanceHit.exists) {
+          throw new functions.https.HttpsError(
+            'failed-precondition',
+            'This payment destination already has a financial balance. Deactivate it instead of removing it.',
+          )
+        }
+      }
+
       await agencyRef.set(
         {
-          receivingAccounts: parsed.data.payload.items.map((item) => ({
+          receivingAccounts: nextItems.map((item) => ({
             id: item.id,
             name: item.name,
             kind: item.kind,
             active: item.active,
+            ...(item.ownership ? { ownership: item.ownership } : {}),
+            ...(item.compatiblePaymentMethodIds && item.compatiblePaymentMethodIds.length > 0
+              ? { compatiblePaymentMethodIds: item.compatiblePaymentMethodIds }
+              : {}),
           })),
           updatedAt: FieldValue.serverTimestamp(),
           updatedBy: actorUid,
@@ -95,7 +200,7 @@ export const manageAgencyConfig = functions
     if (action === 'upsertLocation') {
       const payload = parsed.data.payload
       const id = payload.id ?? db.collection('locations').doc().id
-      await assertUniqueLocationName(payload.name, id)
+      await assertUniqueLocationNameKind(payload.name, payload.kind, id)
       await db
         .collection('locations')
         .doc(id)
@@ -123,6 +228,7 @@ export const manageAgencyConfig = functions
       const payload = parsed.data.payload
       const id = payload.id ?? db.collection('products').doc().id
       await assertUniqueProductCode(payload.code, id)
+      await assertUniqueProductNameKind(payload.name, payload.kind, id)
       await db
         .collection('products')
         .doc(id)
@@ -163,6 +269,7 @@ export const manageAgencyConfig = functions
         throw new functions.https.HttpsError('not-found', 'Select an existing cylinder type for this price.')
       }
       const id = payload.id ?? db.collection('priceRules').doc().id
+      await assertUniquePriceLabelForProduct(payload.productId, payload.label, id)
       await db
         .collection('priceRules')
         .doc(id)
@@ -170,6 +277,7 @@ export const manageAgencyConfig = functions
           {
             productId: payload.productId,
             label: payload.label,
+            labelLower: normalizeNameKey(payload.label),
             amountPaise: payload.amountPaise,
             active: payload.active,
             updatedAt: FieldValue.serverTimestamp(),
