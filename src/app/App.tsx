@@ -8,6 +8,8 @@ import {
   canEditGodown,
   canViewCustomers,
   canViewGodown,
+  canCreateFundTransfer,
+  canViewHisabBalances,
   canViewInventory,
   defaultAuthenticatedPath,
 } from '@shared/rules/permissions'
@@ -48,6 +50,10 @@ import { InventoryReportsPage } from '@/modules/inventory/InventoryReportsPage'
 import { InventoryTransferPage } from '@/modules/inventory/InventoryTransferPage'
 import { SettingsPage } from '@/modules/settings/SettingsPage'
 import { FinancialOpeningPage } from '@/modules/finance/FinancialOpeningPage'
+import { FundTransferDetailPage } from '@/modules/finance/FundTransferDetailPage'
+import { FundTransferPage } from '@/modules/finance/FundTransferPage'
+import { HisabCashbookPage } from '@/modules/finance/HisabCashbookPage'
+import { MainHisabPage } from '@/modules/finance/MainHisabPage'
 import { UsersPage } from '@/modules/users/UsersPage'
 import { missingFirebaseEnv } from '@/services/firebase/client'
 
@@ -108,6 +114,18 @@ function GodownEditGate() {
 function InventoryViewGate() {
   const { role, profile } = useAuth()
   const allow = Boolean(role && profile && canViewInventory(role, profile.permissions))
+  return <PermissionRoute allow={allow} />
+}
+
+function HisabViewGate() {
+  const { role, profile } = useAuth()
+  const allow = Boolean(role && profile && canViewHisabBalances(role, profile.permissions))
+  return <PermissionRoute allow={allow} />
+}
+
+function FundTransferGate() {
+  const { role, profile } = useAuth()
+  const allow = Boolean(role && profile && canCreateFundTransfer(role, profile.permissions))
   return <PermissionRoute allow={allow} />
 }
 
@@ -174,6 +192,14 @@ export function App() {
                 </Route>
                 <Route element={<SettingsGate />}>
                   <Route path="settings" element={<SettingsPage />} />
+                </Route>
+                <Route element={<HisabViewGate />}>
+                  <Route path="hisab" element={<MainHisabPage />} />
+                  <Route path="hisab/cashbook/:accountId" element={<HisabCashbookPage />} />
+                  <Route path="hisab/transfers/:transactionId" element={<FundTransferDetailPage />} />
+                </Route>
+                <Route element={<FundTransferGate />}>
+                  <Route path="hisab/transfer" element={<FundTransferPage />} />
                 </Route>
                 <Route element={<AdminRoute />}>
                   <Route path="users" element={<UsersPage />} />

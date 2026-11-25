@@ -128,6 +128,14 @@ export function godownReversalTransactionId(saleId: string): string {
   return `${saleId}_reversal`
 }
 
+export function fundTransferOutLedgerId(transactionId: string): string {
+  return `${transactionId}_fund_transfer_out`
+}
+
+export function fundTransferInLedgerId(transactionId: string): string {
+  return `${transactionId}_fund_transfer_in`
+}
+
 export type FinancialLedgerDoc = {
   accountId: string
   amountPaise: number

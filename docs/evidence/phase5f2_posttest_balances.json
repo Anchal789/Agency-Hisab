@@ -1,0 +1,113 @@
+{
+  "capturedAt": "2026-11-23T18:20:56.314Z",
+  "purpose": "5F.2 exhaustive verification post-test snapshot",
+  "publication": {
+    "publishedSessionId": "9b618b21-824a-4d16-934f-c93754447648",
+    "publishedGenerationId": "gen_mws7ampa_mnapjzo9",
+    "publishedAt": {
+      "_seconds": 1795375367,
+      "_nanoseconds": 808000000
+    }
+  },
+  "sessionState": "published",
+  "generationId": "gen_mws7ampa_mnapjzo9",
+  "balances": [
+    {
+      "id": "ra_1063acd8-b3ab-4f33-ad3b-268454e31747",
+      "name": "Anchal - Cash",
+      "kind": "cash",
+      "ownership": "agency",
+      "active": true,
+      "balancePaise": 350000,
+      "publishedSessionId": "9b618b21-824a-4d16-934f-c93754447648",
+      "publishedGenerationId": "gen_mws7ampa_mnapjzo9",
+      "needsReconciliation": false
+    },
+    {
+      "id": "ra_5f44999c-e49e-447a-bb1b-e28787e70768",
+      "name": "Anchal UPI",
+      "kind": "upi",
+      "ownership": "agency",
+      "active": true,
+      "balancePaise": 100000,
+      "publishedSessionId": "9b618b21-824a-4d16-934f-c93754447648",
+      "publishedGenerationId": "gen_mws7ampa_mnapjzo9",
+      "needsReconciliation": false
+    },
+    {
+      "id": "ra_2c614f5d-2edb-41e0-829c-50c570301e43",
+      "name": "Bank",
+      "kind": "bank",
+      "ownership": "agency",
+      "active": true,
+      "balancePaise": 111718,
+      "publishedSessionId": "9b618b21-824a-4d16-934f-c93754447648",
+      "publishedGenerationId": "gen_mws7ampa_mnapjzo9",
+      "needsReconciliation": false
+    },
+    {
+      "id": "ra_5a2c83d2-655c-46e0-89ac-b4fed6c1c855",
+      "name": "D.P. Ji Cash",
+      "kind": "cash",
+      "ownership": "agency",
+      "active": true,
+      "balancePaise": 78182,
+      "publishedSessionId": "9b618b21-824a-4d16-934f-c93754447648",
+      "publishedGenerationId": "gen_mws7ampa_mnapjzo9",
+      "needsReconciliation": false
+    },
+    {
+      "id": "ra_94b230e3-3ea3-42db-8b21-dc05a8b60706",
+      "name": "D.P. UPI",
+      "kind": "upi",
+      "ownership": "agency",
+      "active": true,
+      "balancePaise": 100,
+      "publishedSessionId": "9b618b21-824a-4d16-934f-c93754447648",
+      "publishedGenerationId": "gen_mws7ampa_mnapjzo9",
+      "needsReconciliation": false
+    },
+    {
+      "id": "ra_4e9554a8-7020-49e0-9741-23d95fc0414a",
+      "name": "Indian Oil Portal",
+      "kind": "indane_portal",
+      "ownership": "portal",
+      "active": true,
+      "balancePaise": 0,
+      "publishedSessionId": "9b618b21-824a-4d16-934f-c93754447648",
+      "publishedGenerationId": "gen_mws7ampa_mnapjzo9",
+      "needsReconciliation": false
+    },
+    {
+      "id": "ra_1e2b38c5-6fc8-40d9-9083-d7eb149ad974",
+      "name": "Nikhil - Cash",
+      "kind": "cash",
+      "ownership": "third_party_held",
+      "active": true,
+      "balancePaise": 0,
+      "publishedSessionId": "9b618b21-824a-4d16-934f-c93754447648",
+      "publishedGenerationId": "gen_mws7ampa_mnapjzo9",
+      "needsReconciliation": false
+    },
+    {
+      "id": "ra_b1371980-16ec-4d81-8567-fffc6411d4ec",
+      "name": "Nikhil - UPI",
+      "kind": "upi",
+      "ownership": "third_party_held",
+      "active": true,
+      "balancePaise": 0,
+      "publishedSessionId": "9b618b21-824a-4d16-934f-c93754447648",
+      "publishedGenerationId": "gen_mws7ampa_mnapjzo9",
+      "needsReconciliation": false
+    }
+  ],
+  "totalConfiguredBalancePaise": 640000,
+  "fundTransferOutCount": 38,
+  "fundTransferInCount": 38,
+  "fundTransferOutSumPaise": 340016,
+  "fundTransferInSumPaise": 340016,
+  "saleCollectionCount": 3,
+  "pairsMatch": true,
+  "publicationPreserved": true,
+  "totalMoneyConservedVsPretest": true
+}

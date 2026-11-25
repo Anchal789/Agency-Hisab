@@ -4,6 +4,7 @@ import {
   canAccessSettings,
   canAccessUsers,
   defaultAuthenticatedPath,
+  canViewHisabBalances,
   emptyPermissions,
   isAdminRole,
   normalizePermissions,
@@ -32,6 +33,12 @@ describe('permissions and profile parsing', () => {
 
     expect(defaultAuthenticatedPath('staff', none)).toBe('/account')
     expect(defaultAuthenticatedPath('staff', some)).toBe('/')
+  })
+
+  it('allows Hisab balance reads for admin or finance.viewBalances staff', () => {
+    expect(canViewHisabBalances('admin', emptyPermissions())).toBe(true)
+    expect(canViewHisabBalances('staff', emptyPermissions())).toBe(false)
+    expect(canViewHisabBalances('staff', { ...emptyPermissions(), 'finance.viewBalances': true })).toBe(true)
   })
 
   it('parses permission maps from Firestore-shaped objects without dropping granted keys', () => {

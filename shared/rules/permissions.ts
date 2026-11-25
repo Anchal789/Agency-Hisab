@@ -16,6 +16,10 @@ export const STAFF_PERMISSION_KEYS = [
   'reports.viewAssigned',
   /** Phase 5.0 Admin opening workflows also use Admin role; key reserved for staff grants later if needed. */
   'finance.manageOpening',
+  /** Phase 5F destination balances and cashbook reads. */
+  'finance.viewBalances',
+  /** Phase 5F fund transfers (Stage 5F.2+). */
+  'finance.transfer',
 ] as const
 
 export type StaffPermission = (typeof STAFF_PERMISSION_KEYS)[number]
@@ -42,6 +46,8 @@ export function emptyPermissions(): PermissionMap {
     'expenses.create': false,
     'reports.viewAssigned': false,
     'finance.manageOpening': false,
+    'finance.viewBalances': false,
+    'finance.transfer': false,
   }
 }
 
@@ -203,7 +209,7 @@ export function staffPermissionForNavKey(navKey: string): StaffPermission | null
     case 'reports':
       return 'reports.viewAssigned'
     case 'hisab':
-      return 'reports.viewAssigned'
+      return 'finance.viewBalances'
     default:
       return null
   }
@@ -222,14 +228,31 @@ export function canViewNavModule(role: AppRole, permissions: PermissionMap, navK
   if (navKey === 'users') return canAccessUsers(role)
   if (navKey === 'settings') return canAccessSettings(role)
   if (navKey === 'approvals') return role === 'admin'
-  // Phase 5.0 Hisab opening workflow is Admin-only. Staff Hisab reports arrive in later sub-phases.
-  if (navKey === 'hisab') return role === 'admin'
+  // Phase 5F: Main Hisab for Admin or staff with finance.viewBalances. Opening remains Admin-only by route.
+  if (navKey === 'hisab') return canViewHisabBalances(role, permissions)
 
   if (role === 'admin') return true
 
   const permission = staffPermissionForNavKey(navKey)
   if (!permission) return false
   return hasStaffPermission(permissions, permission)
+}
+
+/** Destination balances / Main Hisab reads — Admin or finance.viewBalances. */
+export function canViewHisabBalances(role: AppRole, permissions: PermissionMap): boolean {
+  if (role === 'admin') return true
+  return hasStaffPermission(permissions, 'finance.viewBalances')
+}
+
+/** Financial Opening workflows remain Admin-only. */
+export function canManageFinancialOpening(role: AppRole): boolean {
+  return role === 'admin'
+}
+
+/** Fund transfers — Admin or finance.transfer. Pending-approval staff flow arrives in Stage 5F.5. */
+export function canCreateFundTransfer(role: AppRole, permissions: PermissionMap): boolean {
+  if (role === 'admin') return true
+  return hasStaffPermission(permissions, 'finance.transfer')
 }
 
 /** Visible nav keys in sidebar order for the given actor. */

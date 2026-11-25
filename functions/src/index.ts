@@ -42,6 +42,12 @@ import {
   createOpeningReceivableAdjustment,
   linkOpeningReceivable,
 } from './finance/manual-receivables'
+import {
+  getMainHisabDashboard,
+  listHisabCashbook,
+  listHisabDayLedger,
+} from './finance/main-hisab-reads'
+import { createFundTransfer, getFundTransfer } from './finance/create-fund-transfer'
 
 initializeApp()
 
@@ -83,4 +89,9 @@ export {
   createManualOpeningReceivable,
   linkOpeningReceivable,
   createOpeningReceivableAdjustment,
+  getMainHisabDashboard,
+  listHisabDayLedger,
+  listHisabCashbook,
+  createFundTransfer,
+  getFundTransfer,
 }

@@ -87,6 +87,14 @@
       "queryScope": "COLLECTION",
       "fields": [
         { "fieldPath": "recordScope", "order": "ASCENDING" },
+        { "fieldPath": "businessDate", "order": "ASCENDING" }
+      ]
+    },
+    {
+      "collectionGroup": "financialLedger",
+      "queryScope": "COLLECTION",
+      "fields": [
+        { "fieldPath": "recordScope", "order": "ASCENDING" },
         { "fieldPath": "openingSessionId", "order": "ASCENDING" },
         { "fieldPath": "openingGenerationId", "order": "ASCENDING" },
         { "fieldPath": "accountId", "order": "ASCENDING" }

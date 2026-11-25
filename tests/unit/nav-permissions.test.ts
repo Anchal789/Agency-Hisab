@@ -84,17 +84,20 @@ describe('navigation permission matrix', () => {
       'expenses.create',
       'reports.viewAssigned',
       'finance.manageOpening',
+      'finance.viewBalances',
+      'finance.transfer',
     ])
-    // Phase 5.0: Hisab opening is Admin-only even if a staff finance key exists.
+    // Phase 5F: staff with finance.viewBalances can see Hisab nav (opening route stays Admin-only).
     expect(visibleNavModules('staff', permissions)).toEqual([
       'dashboard',
       'godown',
+      'hisab',
       'customers',
       'inventory',
       'dues',
       'reports',
     ])
-    expect(canViewNavModule('staff', permissions, 'hisab')).toBe(false)
+    expect(canViewNavModule('staff', permissions, 'hisab')).toBe(true)
     expect(canViewNavModule('staff', permissions, 'users')).toBe(false)
     expect(canViewNavModule('staff', permissions, 'settings')).toBe(false)
     expect(canViewNavModule('staff', permissions, 'approvals')).toBe(false)
